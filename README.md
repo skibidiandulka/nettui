@@ -151,6 +151,21 @@ cargo test
 cargo clippy --all-targets --all-features -- -D warnings
 ```
 
+## 📦 Maintainer Release Asset
+
+Always build the GitHub release tarball with:
+
+```bash
+./scripts/build-release-asset.sh
+```
+
+This script enforces the archive layout expected by `nettui-bin` AUR:
+
+- `nettui-v<version>-x86_64/nettui`
+- `nettui-v<version>-x86_64/README.md`
+- `nettui-v<version>-x86_64/LICENSE`
+- `nettui-v<version>-x86_64/config/keybinds.toml.example`
+
 ## ⚖️ License
 
 `nettui` is licensed under `GPL-3.0-only`. See `LICENSE`.

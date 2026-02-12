@@ -23,3 +23,6 @@ jobs:
 
       - name: Run tests
         run: cargo test --verbose --locked
+
+      - name: Validate release asset layout
+        run: ./scripts/build-release-asset.sh
