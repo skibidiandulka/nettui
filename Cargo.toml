@@ -1,0 +1,15 @@
+[package]
+name = "nettui"
+version = "0.1.0"
+edition = "2024"
+description = "Unified TUI for Wi-Fi and Ethernet"
+license = "GPL-3.0-only"
+repository = "https://github.com/skibidiandulka/nettui"
+
+[dependencies]
+anyhow = "1.0"
+crossterm = { version = "0.28", features = ["event-stream"] }
+futures = "0.3"
+if-addrs = "0.13"
+ratatui = "0.29"
+tokio = { version = "1.43", features = ["macros", "rt-multi-thread", "time", "sync", "process"] }
