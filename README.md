@@ -1,9 +1,11 @@
+<p align="center"> TUI for managing Wi-Fi and Ethernet</p>
+
 # nettui
 
 `nettui` is a unified terminal UI for Wi-Fi and Ethernet.
 
 It is built as a clean-room project inspired by the UX direction of tools like `impala` and `ethtui`,
-but with one app shell and switchable Wi-Fi/Ethernet panels.
+but with one app shell and switchable Wi-Fi/Ethernet panels. It was built mainly for OMARCHY arch linux.
 This project was inspired by and builds upon ideas from Impala by pythops.
 
 ## Scope (v0.1)
