@@ -1,93 +1,110 @@
-<p align="center"> TUI for managing Wi-Fi and Ethernet</p>
+<div align="center">
+  <h2>🖧 TUI for managing Wi-Fi and Ethernet</h2>
+</div>
 
 # nettui
 
 `nettui` is a unified terminal UI for Wi-Fi and Ethernet.
 
-It is built as a clean-room project inspired by the UX direction of tools like `impala` and `ethtui`,
-but with one app shell and switchable Wi-Fi/Ethernet panels. It was built mainly for OMARCHY arch linux.
+It is a clean-room project inspired by the UX direction of tools like `impala` and `ethtui`, with one app shell and switchable Wi-Fi/Ethernet panels.  
 This project was inspired by and builds upon ideas from Impala by pythops.
 
-## Runtime assumptions
+## ✨ Features
+
+- One TUI with two transport tabs: `Wi-Fi` and `Ethernet`
+- Startup tab policy: prefer active transport (`Ethernet` if active, else `Wi-Fi` if active)
+- Wi-Fi workflow with split sections: `Known Networks`, `New Networks`, `Device`
+- Non-blocking scan/connect with spinner feedback
+- Connect/disconnect, forget, autoconnect toggle, hidden SSID connect
+- Passphrase fallback flow when iwd reports `No Agent registered`
+- Ethernet details + link up/down + DHCP renew
+- Configurable keybinds via `~/.config/nettui/keybinds.toml`
+- Toast/error popups and terminal size guard (`119x35` minimum)
+
+## 💡 Prerequisites
 
 - Linux
-- Wi-Fi backend: `iwd` service available on D-Bus
-- Ethernet backend: `systemd-networkd` (`networkctl` available)
+- `iwd` running and reachable on D-Bus
+- `systemd-networkd` + `networkctl` available
+- Nerd Fonts recommended for icon rendering
 
-## Installation
+> [!IMPORTANT]
+> To avoid network stack conflicts, keep one wireless manager in control. If `iwd` is your backend, avoid running overlapping managers for Wi-Fi (for example `NetworkManager` or `wpa_supplicant`) at the same time.
 
-From AUR:
+## 🚀 Installation
 
-```bash
-yay -S nettui
-```
-
-or prebuilt binary package:
-
-```bash
-yay -S nettui-bin
-```
-
-From crates.io:
+### crates.io
 
 ```bash
 cargo install nettui
 ```
 
-## Controls
+### Arch Linux (AUR source build)
+
+```bash
+yay -S nettui
+```
+
+### Arch Linux (AUR prebuilt binary)
+
+```bash
+yay -S nettui-bin
+```
+
+## 🪄 Usage
+
+```bash
+nettui
+```
+
+## ⌨️ Controls
 
 Global:
 
 - `h/l` or `←/→`: switch transport tab (`Wi-Fi` / `Ethernet`)
 - `j/k` or `↓/↑`: move selection
-- `r`: refresh
-- `q` (or `Esc`): quit
+- `r`: refresh (shows info toast)
+- `q` or `Esc`: quit
 
 Wi-Fi tab:
 
 - `Tab` / `Shift+Tab`: switch focus (`Known` / `New` / `Device`)
 - `s`: scan
 - `Enter`: connect/disconnect selected network
-- `Enter` in passphrase popup: connect with passphrase
-- `a`: show/hide additional entries (`Known`: unavailable, `New`: hidden)
+- `a`: show/hide extra entries (`Known`: unavailable, `New`: hidden)
 - `d`: forget selected known network
 - `t`: toggle autoconnect for selected known network
-- `n`: connect hidden network (from `New` section)
+- `n`: connect hidden network (in `New`)
 - `i`: toggle Wi-Fi details popup
-- `New Networks` shows `- no new networks -` when no entries are discovered
-- `refresh` and `show all` actions display info toast feedback
+- Empty `New Networks` list shows `- no new networks -`
 
 Ethernet tab:
 
 - `Enter`: toggle selected interface link (`up/down`)
 - `n`: renew DHCP on selected interface
 
-## Keybind configuration
+## ⚙️ Keybind config
 
-`nettui` reads optional key overrides from:
+Config file path:
 
-`~/.config/nettui/keybinds.toml`
+```bash
+~/.config/nettui/keybinds.toml
+```
 
-On first launch, `nettui` automatically creates this file with defaults if it does not exist.
+On first launch, `nettui` auto-creates this file with defaults.
 
-You can still reset it manually from template:
+To reset from template:
 
 ```bash
 mkdir -p ~/.config/nettui
 cp /usr/share/doc/nettui/keybinds.toml.example ~/.config/nettui/keybinds.toml
 ```
 
-Edit your keybinds directly in:
+Edit this file directly and restart `nettui` after changes.
 
-```bash
-~/.config/nettui/keybinds.toml
-```
+## 🔄 Restart / control
 
-After changing keybinds, restart `nettui`.
-
-## Restart / control
-
-`nettui` is not a systemd service, so `systemctl` is not used.
+`nettui` is not a `systemd` service, so `systemctl` does not apply.
 
 Quick restart:
 
@@ -96,57 +113,46 @@ pkill -x nettui || true
 omarchy-launch-or-focus-tui nettui
 ```
 
-From inside the app:
+## 🧩 Omarchy integration
 
-- press `q` to quit
-- launch again from Waybar network icon (or run `omarchy-launch-wifi`)
+Launcher behavior depends on your local Omarchy scripts.
 
-## Build
-
-```bash
-cargo build
-cargo test
-```
-
-## License
-
-`nettui` is licensed under `GPL-3.0-only`. See `LICENSE`.
-
-## Omarchy integration (optional)
-
-Current Omarchy launcher behavior:
+Check current behavior:
 
 ```bash
-omarchy-launch-wifi
+sed -n 1,220p ~/.local/share/omarchy/bin/omarchy-launch-wifi
+sed -n 1,180p ~/.local/share/omarchy/bin/omarchy-launch-ethernet
 ```
 
-To force `nettui` as default network TUI:
+By default on many setups:
 
-1. Install `nettui`:
+- Wi-Fi click path prefers `impala`
+- Ethernet fallback can use `ethtui` when available
 
-```bash
-yay -S nettui-bin
-```
+That means installing `ethtui` alone usually does **not** replace Wi-Fi handling automatically.
 
-2. Verify launcher script prefers `nettui`:
-
-```bash
-grep -n "nettui" ~/.local/share/omarchy/bin/omarchy-launch-wifi
-grep -n "nettui" ~/.local/share/omarchy/bin/omarchy-launch-ethernet
-```
-
-3. If needed, patch both launchers:
+To force `nettui` for network clicks:
 
 ```bash
 sed -i 's/omarchy-launch-or-focus-tui impala/omarchy-launch-or-focus-tui nettui/g' ~/.local/share/omarchy/bin/omarchy-launch-wifi
 sed -i 's/omarchy-launch-or-focus-tui ethtui/omarchy-launch-or-focus-tui nettui/g' ~/.local/share/omarchy/bin/omarchy-launch-ethernet
 ```
 
-4. Set dedicated floating window size for `nettui` (Hyprland):
+Optional Hyprland size rule for `org.omarchy.nettui`:
 
 ```bash
 grep -q "match:class org.omarchy.nettui" ~/.config/hypr/apps/system.conf || echo "windowrule = size 1190 735, match:class org.omarchy.nettui" >> ~/.config/hypr/apps/system.conf
 hyprctl reload
 ```
 
-5. Click network module in Waybar to verify `nettui` opens.
+## 🛠️ Build
+
+```bash
+cargo build
+cargo test
+cargo clippy --all-targets --all-features -- -D warnings
+```
+
+## ⚖️ License
+
+`nettui` is licensed under `GPL-3.0-only`. See `LICENSE`.
