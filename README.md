@@ -15,6 +15,8 @@ This project was inspired by and builds upon ideas from Impala by pythops.
 - Startup tab policy: prefer active transport (`Ethernet` if active, else `Wi-Fi` if active)
 - Wi-Fi workflow with split sections: `Known Networks`, `New Networks`, `Device`
 - Non-blocking scan/connect with spinner feedback
+- Debounced scan input (prevents accidental rapid scan spam)
+- Scan/connect timeout guards to avoid stuck pending states
 - Connect/disconnect, forget, autoconnect toggle, hidden SSID connect
 - Passphrase fallback flow when iwd reports `No Agent registered`
 - Ethernet details + link up/down + DHCP renew
@@ -56,6 +58,24 @@ yay -S nettui-bin
 ```bash
 nettui
 ```
+
+## ⚙️ Runtime behavior
+
+- UI tick drives animation and key handling.
+- Data refresh is rate-limited (not full refresh on every tick), which keeps spinner/input responsive.
+- Wi-Fi scan is debounced for rapid repeated key presses.
+- Wi-Fi scan/connect jobs are timeout-guarded to avoid frozen pending states.
+- Startup warns when overlapping Wi-Fi managers are active with `iwd`.
+
+## 🩺 Troubleshooting
+
+- `scan` says `Wi-Fi scan already running`:
+  - previous scan is still in progress.
+- `scan` says `Wait ... ms before next scan`:
+  - debounce cooldown is active; retry after the short wait.
+- spinner appears frozen:
+  - check terminal size is at least `119x35`,
+  - verify `iwd` is healthy and not conflicting with another Wi-Fi manager.
 
 ## ⌨️ Controls
 

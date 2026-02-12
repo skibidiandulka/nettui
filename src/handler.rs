@@ -84,7 +84,6 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> Result<()>
         {
             app.clear_error();
             app.wifi_forget_selected().await?;
-            app.refresh_current().await;
         }
 
         KeyCode::Char(c)
@@ -94,7 +93,6 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> Result<()>
         {
             app.clear_error();
             app.wifi_toggle_autoconnect_selected().await?;
-            app.refresh_current().await;
         }
 
         KeyCode::Char(c)
@@ -114,7 +112,6 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> Result<()>
         {
             app.clear_error();
             app.wifi_connect_or_disconnect().await?;
-            app.refresh_current().await;
         }
 
         KeyCode::Char(c)
@@ -131,8 +128,6 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> Result<()>
             app.clear_error();
             if let Err(e) = app.ethernet_renew_dhcp().await {
                 app.last_error = Some(e.to_string());
-            } else {
-                app.refresh_current().await;
             }
         }
 
@@ -140,8 +135,6 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> Result<()>
             app.clear_error();
             if let Err(e) = app.ethernet_toggle_link().await {
                 app.last_error = Some(e.to_string());
-            } else {
-                app.refresh_current().await;
             }
         }
 

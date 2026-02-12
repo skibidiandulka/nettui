@@ -1,6 +1,6 @@
 [package]
 name = "nettui"
-version = "0.1.11"
+version = "0.1.12"
 edition = "2024"
 description = "Unified TUI for Wi-Fi and Ethernet"
 license = "GPL-3.0-only"
