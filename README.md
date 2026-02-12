@@ -115,27 +115,25 @@ omarchy-launch-or-focus-tui nettui
 
 ## 🧩 Omarchy integration
 
-Launcher behavior depends on your local Omarchy scripts.
-
-Check current behavior:
+Official Omarchy `dev` launcher (`bin/omarchy-launch-wifi`) is:
 
 ```bash
-sed -n 1,220p ~/.local/share/omarchy/bin/omarchy-launch-wifi
-sed -n 1,180p ~/.local/share/omarchy/bin/omarchy-launch-ethernet
+rfkill unblock wifi
+omarchy-launch-or-focus-tui impala
 ```
 
-By default on many setups:
+So installing `ethtui` alone does not replace Wi-Fi handling automatically.
 
-- Wi-Fi click path prefers `impala`
-- Ethernet fallback can use `ethtui` when available
-
-That means installing `ethtui` alone usually does **not** replace Wi-Fi handling automatically.
-
-To force `nettui` for network clicks:
+To use `nettui` instead of `impala` in your local Omarchy install:
 
 ```bash
 sed -i 's/omarchy-launch-or-focus-tui impala/omarchy-launch-or-focus-tui nettui/g' ~/.local/share/omarchy/bin/omarchy-launch-wifi
-sed -i 's/omarchy-launch-or-focus-tui ethtui/omarchy-launch-or-focus-tui nettui/g' ~/.local/share/omarchy/bin/omarchy-launch-ethernet
+```
+
+Verify:
+
+```bash
+sed -n '1,120p' ~/.local/share/omarchy/bin/omarchy-launch-wifi
 ```
 
 Optional Hyprland size rule for `org.omarchy.nettui`:
