@@ -9,10 +9,14 @@ but with one app shell and switchable Wi-Fi/Ethernet panels.
 
 - One TUI with two transport tabs: `Wi-Fi` and `Ethernet`
 - Startup tab policy: prefer active transport (`Ethernet` if active, else `Wi-Fi` if active)
-- Wi-Fi (iwd/iwctl):
-  - split sections: `Known Networks`, `New Networks`, `Adapter`
+- Wi-Fi (iwd via D-Bus / `iwdrs`):
+  - split sections: `Known Networks`, `New Networks`, `Device`
   - scan
   - connect/disconnect selected network
+  - forget known network
+  - toggle autoconnect
+  - show/hide unavailable known and hidden network entries
+  - connect hidden network by SSID prompt
   - detail popup for active Wi-Fi interface (`i`)
 - Ethernet (systemd-networkd):
   - list interfaces and details
@@ -22,7 +26,7 @@ but with one app shell and switchable Wi-Fi/Ethernet panels.
 ## Runtime assumptions
 
 - Linux
-- Wi-Fi backend: `iwd` (`iwctl` available)
+- Wi-Fi backend: `iwd` service available on D-Bus
 - Ethernet backend: `systemd-networkd` (`networkctl` available)
 
 ## Installation
@@ -50,9 +54,13 @@ Global:
 
 Wi-Fi tab:
 
-- `Tab` / `Shift+Tab`: switch focus (`Known` / `New` / `Adapter`)
+- `Tab` / `Shift+Tab`: switch focus (`Known` / `New` / `Device`)
 - `s`: scan
 - `Enter`: connect/disconnect selected network
+- `a`: show/hide additional entries (`Known`: unavailable, `New`: hidden)
+- `d`: forget selected known network
+- `t`: toggle autoconnect for selected known network
+- `n`: connect hidden network (from `New` section)
 - `i`: toggle Wi-Fi details popup
 
 Ethernet tab:

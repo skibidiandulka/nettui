@@ -1,9 +1,5 @@
 use crate::{
-    backend::{
-        iwd::IwdBackend,
-        networkd::NetworkdBackend,
-        traits::{EthernetBackend, WifiBackend},
-    },
+    backend::{iwd::IwdBackend, networkd::NetworkdBackend, traits::EthernetBackend},
     domain::{
         common::{ActiveTab, StartupTabPolicy, Toast, ToastKind, WifiFocus},
         ethernet::{EthernetIface, EthernetState},
@@ -44,6 +40,10 @@ pub struct App {
     pub wifi_adapter_state: TableState,
     pub wifi_iface_details: Option<EthernetIface>,
     pub show_wifi_details: bool,
+    pub show_unavailable_known_networks: bool,
+    pub show_hidden_networks: bool,
+    pub hidden_connect_prompt: bool,
+    pub hidden_ssid_input: String,
 
     pub ethernet: EthernetState,
     pub ethernet_state: TableState,
@@ -63,6 +63,7 @@ impl App {
 
         let wifi = wifi_backend
             .query_state()
+            .await
             .unwrap_or_else(|_| WifiState::empty());
         let ethernet = EthernetState {
             ifaces: eth_backend.list_ifaces().unwrap_or_default(),
@@ -71,7 +72,6 @@ impl App {
             .ifaces
             .first()
             .and_then(|iface| eth_backend.iface_details(iface).ok());
-
         let active_tab = determine_start_tab(config.startup_policy, &wifi, &ethernet);
 
         let mut app = Self {
@@ -85,6 +85,10 @@ impl App {
             wifi_adapter_state: TableState::default(),
             wifi_iface_details,
             show_wifi_details: false,
+            show_unavailable_known_networks: false,
+            show_hidden_networks: false,
+            hidden_connect_prompt: false,
+            hidden_ssid_input: String::new(),
             ethernet,
             ethernet_state: TableState::default(),
             last_error: None,
@@ -105,7 +109,6 @@ impl App {
         {
             self.toast = None;
         }
-
         self.refresh_all().await;
         Ok(())
     }
@@ -115,7 +118,7 @@ impl App {
         let new_ssid = self.selected_new_ssid();
         let selected_eth = self.selected_eth_iface().map(|i| i.name.clone());
 
-        if let Ok(wifi) = self.wifi_backend.query_state() {
+        if let Ok(wifi) = self.wifi_backend.query_state().await {
             self.wifi = wifi;
             self.restore_wifi_selection(known_ssid, new_ssid);
             self.wifi_iface_details = self
@@ -191,13 +194,16 @@ impl App {
         match self.active_tab {
             ActiveTab::Wifi => match self.wifi_focus {
                 WifiFocus::KnownNetworks => {
-                    select_next_in_state(&mut self.wifi_known_state, self.wifi.known_networks.len())
+                    let len = self.known_total_len();
+                    select_next_in_state(&mut self.wifi_known_state, len)
                 }
                 WifiFocus::NewNetworks => {
-                    select_next_in_state(&mut self.wifi_new_state, self.wifi.new_networks.len())
+                    let len = self.new_total_len();
+                    select_next_in_state(&mut self.wifi_new_state, len)
                 }
                 WifiFocus::Adapter => {
-                    select_next_in_state(&mut self.wifi_adapter_state, self.wifi.ifaces.len())
+                    let len = self.device_total_len();
+                    select_next_in_state(&mut self.wifi_adapter_state, len)
                 }
             },
             ActiveTab::Ethernet => {
@@ -210,13 +216,16 @@ impl App {
         match self.active_tab {
             ActiveTab::Wifi => match self.wifi_focus {
                 WifiFocus::KnownNetworks => {
-                    select_prev_in_state(&mut self.wifi_known_state, self.wifi.known_networks.len())
+                    let len = self.known_total_len();
+                    select_prev_in_state(&mut self.wifi_known_state, len)
                 }
                 WifiFocus::NewNetworks => {
-                    select_prev_in_state(&mut self.wifi_new_state, self.wifi.new_networks.len())
+                    let len = self.new_total_len();
+                    select_prev_in_state(&mut self.wifi_new_state, len)
                 }
                 WifiFocus::Adapter => {
-                    select_prev_in_state(&mut self.wifi_adapter_state, self.wifi.ifaces.len())
+                    let len = self.device_total_len();
+                    select_prev_in_state(&mut self.wifi_adapter_state, len)
                 }
             },
             ActiveTab::Ethernet => {
@@ -227,14 +236,8 @@ impl App {
 
     pub fn selected_wifi_network(&self) -> Option<&WifiNetwork> {
         match self.wifi_focus {
-            WifiFocus::KnownNetworks => self
-                .wifi_known_state
-                .selected()
-                .and_then(|i| self.wifi.known_networks.get(i)),
-            WifiFocus::NewNetworks => self
-                .wifi_new_state
-                .selected()
-                .and_then(|i| self.wifi.new_networks.get(i)),
+            WifiFocus::KnownNetworks => self.selected_known_network(),
+            WifiFocus::NewNetworks => self.selected_new_network(),
             WifiFocus::Adapter => None,
         }
     }
@@ -265,66 +268,188 @@ impl App {
         self.show_wifi_details = !self.show_wifi_details;
     }
 
+    pub fn toggle_known_show_all(&mut self) {
+        self.show_unavailable_known_networks = !self.show_unavailable_known_networks;
+        let len = self.known_total_len();
+        clamp_selected(&mut self.wifi_known_state, len);
+    }
+
+    pub fn toggle_new_show_all(&mut self) {
+        self.show_hidden_networks = !self.show_hidden_networks;
+        let len = self.new_total_len();
+        clamp_selected(&mut self.wifi_new_state, len);
+    }
+
+    pub fn open_hidden_connect_prompt(&mut self) {
+        self.hidden_connect_prompt = true;
+        self.hidden_ssid_input.clear();
+    }
+
+    pub fn close_hidden_connect_prompt(&mut self) {
+        self.hidden_connect_prompt = false;
+        self.hidden_ssid_input.clear();
+    }
+
+    pub fn hidden_input_push(&mut self, c: char) {
+        self.hidden_ssid_input.push(c);
+    }
+
+    pub fn hidden_input_backspace(&mut self) {
+        self.hidden_ssid_input.pop();
+    }
+
+    pub async fn submit_hidden_connect(&mut self) {
+        let ssid = self.hidden_ssid_input.trim().to_string();
+        if ssid.is_empty() {
+            self.set_toast(ToastKind::Error, "SSID cannot be empty");
+            return;
+        }
+
+        match self.wifi_backend.connect_hidden(&ssid).await {
+            Ok(()) => {
+                self.last_action = Some(format!("Connect hidden requested: {ssid}"));
+                self.set_toast(ToastKind::Info, format!("Connect hidden requested: {ssid}"));
+                self.notify("Wi-Fi", &format!("Connect hidden: {ssid}"))
+                    .await;
+                self.close_hidden_connect_prompt();
+            }
+            Err(e) => {
+                let msg = friendly_wifi_error("connect hidden network", &e);
+                self.set_toast(ToastKind::Error, msg);
+            }
+        }
+    }
+
     pub async fn notify(&self, title: &str, body: &str) {
         let _ = Command::new("notify-send")
             .arg(title)
             .arg(body)
             .arg("-t")
-            .arg("2000")
+            .arg("2200")
             .output()
             .await;
     }
 
     pub async fn wifi_scan(&mut self) -> Result<()> {
-        let iface = self
-            .wifi
-            .ifaces
-            .first()
-            .cloned()
-            .ok_or_else(|| std::io::Error::other("no wifi adapter found"))?;
-        self.wifi_backend.scan(&iface).await?;
-        tokio::time::sleep(Duration::from_millis(1200)).await;
-        self.last_action = Some(format!("Wi-Fi scan requested on {iface}"));
-        self.set_toast(ToastKind::Info, format!("Wi-Fi scan requested on {iface}"));
-        self.notify("Wi-Fi", &format!("Scan requested on {iface}"))
-            .await;
+        match self.wifi_backend.scan().await {
+            Ok(()) => {
+                self.last_action = Some("Wi-Fi scan requested".to_string());
+                self.set_toast(ToastKind::Info, "Wi-Fi scan requested");
+                self.notify("Wi-Fi", "Scan requested").await;
+            }
+            Err(e) => {
+                let msg = friendly_wifi_error("scan", &e);
+                self.set_toast(ToastKind::Error, msg);
+            }
+        }
         Ok(())
     }
 
     pub async fn wifi_connect_or_disconnect(&mut self) -> Result<()> {
-        let iface = self
-            .wifi
-            .ifaces
-            .first()
-            .cloned()
-            .ok_or_else(|| std::io::Error::other("no wifi adapter found"))?;
-
         let Some(net) = self.selected_wifi_network().cloned() else {
-            return Err(
-                std::io::Error::other("select a network in Known or New Networks first").into(),
-            );
+            self.set_toast(ToastKind::Error, "No network selected");
+            return Ok(());
         };
 
-        if net.connected {
-            self.wifi_backend.disconnect(&iface).await?;
-            self.last_action = Some(format!("Disconnected Wi-Fi on {iface}"));
+        if self.wifi_focus == WifiFocus::KnownNetworks && !net.available {
             self.set_toast(
-                ToastKind::Success,
-                format!("Disconnected from {}", net.ssid),
+                ToastKind::Info,
+                "Unavailable known network cannot be connected directly",
             );
-            self.notify("Wi-Fi", &format!("Disconnected from {}", net.ssid))
-                .await;
-        } else {
-            self.wifi_backend.connect(&iface, &net.ssid).await?;
-            self.last_action = Some(format!("Connect requested to {}", net.ssid));
-            self.set_toast(
-                ToastKind::Success,
-                format!("Connect requested to {}", net.ssid),
-            );
-            self.notify("Wi-Fi", &format!("Connect requested to {}", net.ssid))
-                .await;
+            return Ok(());
         }
 
+        let op = if net.connected {
+            self.wifi_backend.disconnect().await
+        } else {
+            self.wifi_backend.connect(&net.ssid).await
+        };
+
+        match op {
+            Ok(()) => {
+                if net.connected {
+                    self.last_action = Some("Disconnected Wi-Fi".to_string());
+                    self.set_toast(
+                        ToastKind::Success,
+                        format!("Disconnected from {}", net.ssid),
+                    );
+                    self.notify("Wi-Fi", &format!("Disconnected from {}", net.ssid))
+                        .await;
+                } else {
+                    self.last_action = Some(format!("Connect requested to {}", net.ssid));
+                    self.set_toast(
+                        ToastKind::Success,
+                        format!("Connect requested to {}", net.ssid),
+                    );
+                    self.notify("Wi-Fi", &format!("Connect requested to {}", net.ssid))
+                        .await;
+                }
+            }
+            Err(e) => {
+                let msg = friendly_wifi_error("connect/disconnect", &e);
+                self.set_toast(ToastKind::Error, msg);
+            }
+        }
+
+        Ok(())
+    }
+
+    pub async fn wifi_forget_selected(&mut self) -> Result<()> {
+        if self.wifi_focus != WifiFocus::KnownNetworks {
+            self.set_toast(ToastKind::Info, "Forget is available in Known Networks");
+            return Ok(());
+        }
+
+        let Some(net) = self.selected_known_network().cloned() else {
+            self.set_toast(ToastKind::Error, "No known network selected");
+            return Ok(());
+        };
+
+        match self.wifi_backend.forget_known(&net.ssid).await {
+            Ok(()) => {
+                self.last_action = Some(format!("Forgot network {}", net.ssid));
+                self.set_toast(ToastKind::Success, format!("Forgot network {}", net.ssid));
+                self.notify("Wi-Fi", &format!("Forgot network {}", net.ssid))
+                    .await;
+            }
+            Err(e) => {
+                let msg = friendly_wifi_error("forget known network", &e);
+                self.set_toast(ToastKind::Error, msg);
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn wifi_toggle_autoconnect_selected(&mut self) -> Result<()> {
+        if self.wifi_focus != WifiFocus::KnownNetworks {
+            self.set_toast(
+                ToastKind::Info,
+                "Autoconnect toggle is available in Known Networks",
+            );
+            return Ok(());
+        }
+
+        let Some(net) = self.selected_known_network().cloned() else {
+            self.set_toast(ToastKind::Error, "No known network selected");
+            return Ok(());
+        };
+
+        match self.wifi_backend.toggle_autoconnect(&net.ssid).await {
+            Ok(enabled) => {
+                let state = if enabled { "enabled" } else { "disabled" };
+                self.last_action = Some(format!("Autoconnect {} for {}", state, net.ssid));
+                self.set_toast(
+                    ToastKind::Success,
+                    format!("Autoconnect {} for {}", state, net.ssid),
+                );
+                self.notify("Wi-Fi", &format!("Autoconnect {}: {}", state, net.ssid))
+                    .await;
+            }
+            Err(e) => {
+                let msg = friendly_wifi_error("toggle autoconnect", &e);
+                self.set_toast(ToastKind::Error, msg);
+            }
+        }
         Ok(())
     }
 
@@ -361,10 +486,59 @@ impl App {
         Ok(())
     }
 
+    fn known_total_len(&self) -> usize {
+        self.wifi.known_networks.len()
+            + if self.show_unavailable_known_networks {
+                self.wifi.unavailable_known_networks.len()
+            } else {
+                0
+            }
+    }
+
+    fn new_total_len(&self) -> usize {
+        self.wifi.new_networks.len()
+            + if self.show_hidden_networks {
+                self.wifi.hidden_networks.len()
+            } else {
+                0
+            }
+    }
+
+    fn device_total_len(&self) -> usize {
+        usize::from(self.wifi.device.is_some())
+    }
+
+    fn selected_known_network(&self) -> Option<&WifiNetwork> {
+        let idx = self.wifi_known_state.selected()?;
+        if idx < self.wifi.known_networks.len() {
+            return self.wifi.known_networks.get(idx);
+        }
+        if !self.show_unavailable_known_networks {
+            return None;
+        }
+        let hidden_idx = idx.saturating_sub(self.wifi.known_networks.len());
+        self.wifi.unavailable_known_networks.get(hidden_idx)
+    }
+
+    fn selected_new_network(&self) -> Option<&WifiNetwork> {
+        let idx = self.wifi_new_state.selected()?;
+        if idx < self.wifi.new_networks.len() {
+            return self.wifi.new_networks.get(idx);
+        }
+        if !self.show_hidden_networks {
+            return None;
+        }
+        let hidden_idx = idx.saturating_sub(self.wifi.new_networks.len());
+        self.wifi.hidden_networks.get(hidden_idx)
+    }
+
     fn init_wifi_states(&mut self) {
-        select_first_if_any(&mut self.wifi_known_state, self.wifi.known_networks.len());
-        select_first_if_any(&mut self.wifi_new_state, self.wifi.new_networks.len());
-        select_first_if_any(&mut self.wifi_adapter_state, self.wifi.ifaces.len());
+        let known_len = self.known_total_len();
+        let new_len = self.new_total_len();
+        let device_len = self.device_total_len();
+        select_first_if_any(&mut self.wifi_known_state, known_len);
+        select_first_if_any(&mut self.wifi_new_state, new_len);
+        select_first_if_any(&mut self.wifi_adapter_state, device_len);
         self.ensure_valid_wifi_focus();
     }
 
@@ -373,41 +547,66 @@ impl App {
     }
 
     fn selected_known_ssid(&self) -> Option<String> {
-        self.wifi_known_state
-            .selected()
-            .and_then(|i| self.wifi.known_networks.get(i))
-            .map(|n| n.ssid.clone())
+        self.selected_known_network().map(|n| n.ssid.clone())
     }
 
     fn selected_new_ssid(&self) -> Option<String> {
-        self.wifi_new_state
-            .selected()
-            .and_then(|i| self.wifi.new_networks.get(i))
-            .map(|n| n.ssid.clone())
+        self.selected_new_network().map(|n| n.ssid.clone())
     }
 
     fn restore_wifi_selection(&mut self, known_ssid: Option<String>, new_ssid: Option<String>) {
         if let Some(ssid) = known_ssid {
             if let Some(idx) = self.wifi.known_networks.iter().position(|n| n.ssid == ssid) {
                 self.wifi_known_state.select(Some(idx));
+            } else if self.show_unavailable_known_networks {
+                if let Some(idx) = self
+                    .wifi
+                    .unavailable_known_networks
+                    .iter()
+                    .position(|n| n.ssid == ssid)
+                {
+                    self.wifi_known_state
+                        .select(Some(self.wifi.known_networks.len() + idx));
+                } else {
+                    let len = self.known_total_len();
+                    select_first_if_any(&mut self.wifi_known_state, len);
+                }
             } else {
-                select_first_if_any(&mut self.wifi_known_state, self.wifi.known_networks.len());
+                let len = self.known_total_len();
+                select_first_if_any(&mut self.wifi_known_state, len);
             }
         } else {
-            select_first_if_any(&mut self.wifi_known_state, self.wifi.known_networks.len());
+            let len = self.known_total_len();
+            select_first_if_any(&mut self.wifi_known_state, len);
         }
 
         if let Some(ssid) = new_ssid {
             if let Some(idx) = self.wifi.new_networks.iter().position(|n| n.ssid == ssid) {
                 self.wifi_new_state.select(Some(idx));
+            } else if self.show_hidden_networks {
+                if let Some(idx) = self
+                    .wifi
+                    .hidden_networks
+                    .iter()
+                    .position(|n| n.ssid == ssid)
+                {
+                    self.wifi_new_state
+                        .select(Some(self.wifi.new_networks.len() + idx));
+                } else {
+                    let len = self.new_total_len();
+                    select_first_if_any(&mut self.wifi_new_state, len);
+                }
             } else {
-                select_first_if_any(&mut self.wifi_new_state, self.wifi.new_networks.len());
+                let len = self.new_total_len();
+                select_first_if_any(&mut self.wifi_new_state, len);
             }
         } else {
-            select_first_if_any(&mut self.wifi_new_state, self.wifi.new_networks.len());
+            let len = self.new_total_len();
+            select_first_if_any(&mut self.wifi_new_state, len);
         }
 
-        select_first_if_any(&mut self.wifi_adapter_state, self.wifi.ifaces.len());
+        let len = self.device_total_len();
+        select_first_if_any(&mut self.wifi_adapter_state, len);
     }
 
     fn restore_ethernet_selection(&mut self, selected_iface: Option<String>) {
@@ -438,9 +637,9 @@ impl App {
 
     fn focus_has_items(&self, focus: WifiFocus) -> bool {
         match focus {
-            WifiFocus::KnownNetworks => !self.wifi.known_networks.is_empty(),
-            WifiFocus::NewNetworks => !self.wifi.new_networks.is_empty(),
-            WifiFocus::Adapter => !self.wifi.ifaces.is_empty(),
+            WifiFocus::KnownNetworks => self.known_total_len() > 0,
+            WifiFocus::NewNetworks => self.new_total_len() > 0,
+            WifiFocus::Adapter => self.device_total_len() > 0,
         }
     }
 }
@@ -465,6 +664,22 @@ pub fn determine_start_tab(
             }
         }
     }
+}
+
+fn friendly_wifi_error(action: &str, err: &anyhow::Error) -> String {
+    let msg = err.to_string();
+    let lower = msg.to_lowercase();
+    if lower.contains("accessdenied")
+        || lower.contains("permission denied")
+        || lower.contains("not authorized")
+        || lower.contains("operation not permitted")
+    {
+        return format!(
+            "{} requires elevated permissions. Run with proper privileges and retry.",
+            action
+        );
+    }
+    msg
 }
 
 fn snapshot_eth(iface: Option<&EthernetIface>) -> String {
@@ -519,6 +734,15 @@ fn select_prev_in_state(state: &mut TableState, len: usize) {
     state.select(Some(i));
 }
 
+fn clamp_selected(state: &mut TableState, len: usize) {
+    if len == 0 {
+        state.select(None);
+        return;
+    }
+    let idx = state.selected().unwrap_or(0).min(len - 1);
+    state.select(Some(idx));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -529,7 +753,9 @@ mod tests {
             ifaces: vec!["wlan0".to_string()],
             connected_ssid: Some("Home".to_string()),
             known_networks: vec![],
+            unavailable_known_networks: vec![],
             new_networks: vec![],
+            hidden_networks: vec![],
             device: None,
         };
         let ethernet = EthernetState {
@@ -558,7 +784,9 @@ mod tests {
             ifaces: vec!["wlan0".to_string()],
             connected_ssid: None,
             known_networks: vec![],
+            unavailable_known_networks: vec![],
             new_networks: vec![],
+            hidden_networks: vec![],
             device: None,
         };
         let ethernet = EthernetState { ifaces: vec![] };

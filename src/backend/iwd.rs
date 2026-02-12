@@ -1,11 +1,7 @@
-use crate::{
-    backend::traits::WifiBackend,
-    domain::wifi::{WifiDeviceInfo, WifiNetwork, WifiState},
-};
-use anyhow::Result;
-use std::collections::HashSet;
-use std::{fs, path::Path};
-use tokio::process::Command;
+use crate::domain::wifi::{WifiDeviceInfo, WifiNetwork, WifiState};
+use anyhow::{Context, Result};
+use iwdrs::session::Session;
+use std::{collections::HashMap, fs, path::Path};
 
 pub struct IwdBackend;
 
@@ -14,69 +10,309 @@ impl IwdBackend {
         Self
     }
 
-    pub async fn scan(&self, iface: &str) -> Result<()> {
-        run_iwctl(&["station", iface, "scan"]).await
-    }
-
-    pub async fn connect(&self, iface: &str, ssid: &str) -> Result<()> {
-        run_iwctl(&["station", iface, "connect", ssid]).await
-    }
-
-    pub async fn disconnect(&self, iface: &str) -> Result<()> {
-        run_iwctl(&["station", iface, "disconnect"]).await
-    }
-}
-
-impl WifiBackend for IwdBackend {
-    fn query_state(&self) -> Result<WifiState> {
+    pub async fn query_state(&self) -> Result<WifiState> {
         let ifaces = list_wifi_ifaces();
         if ifaces.is_empty() {
             return Ok(WifiState::empty());
         }
-
         let iface = ifaces[0].clone();
-        let connected_ssid = parse_connected_network(&iface);
-        let mut known_networks = parse_known_networks();
-        let mut new_networks = parse_networks(&iface);
-        let station_info = parse_station_info(&iface);
 
-        if let Some(conn) = &connected_ssid {
-            for n in &mut known_networks {
-                if &n.ssid == conn {
-                    n.connected = true;
-                }
-            }
-            for n in &mut new_networks {
-                if &n.ssid == conn {
-                    n.connected = true;
-                }
+        let session = Session::new().await.context("cannot access iwd service")?;
+        let station = session
+            .stations()
+            .await?
+            .pop()
+            .context("no wifi station found")?;
+
+        let connected_ssid = if let Some(n) = station.connected_network().await? {
+            n.name().await.ok()
+        } else {
+            None
+        };
+
+        let known_meta = load_known_meta(&session).await;
+        let discovered = station.discovered_networks().await?;
+
+        let mut known_networks = Vec::new();
+        let mut new_networks = Vec::new();
+        let mut available_names = std::collections::HashSet::new();
+
+        for (network, signal_dbm) in discovered {
+            let name = match network.name().await {
+                Ok(v) if !v.is_empty() => v,
+                _ => continue,
+            };
+            let security = network
+                .network_type()
+                .await
+                .map(|v| v.to_string())
+                .unwrap_or_else(|_| "-".to_string());
+            let connected = connected_ssid.as_deref() == Some(name.as_str());
+            let signal = percent_signal(signal_dbm);
+
+            if let Some(meta) = known_meta.get(&name) {
+                available_names.insert(name.clone());
+                known_networks.push(WifiNetwork {
+                    ssid: name,
+                    security,
+                    signal,
+                    connected,
+                    hidden: Some(meta.hidden),
+                    autoconnect: Some(meta.autoconnect),
+                    available: true,
+                });
+            } else {
+                new_networks.push(WifiNetwork {
+                    ssid: name,
+                    security,
+                    signal,
+                    connected,
+                    hidden: None,
+                    autoconnect: None,
+                    available: true,
+                });
             }
         }
 
-        // Keep "new networks" focused on unknown SSIDs for UX consistency with impala.
-        let known_ssids: HashSet<&str> = known_networks.iter().map(|n| n.ssid.as_str()).collect();
-        new_networks.retain(|n| !known_ssids.contains(n.ssid.as_str()));
+        known_networks.sort_by(|a, b| a.ssid.cmp(&b.ssid));
+        new_networks.sort_by(|a, b| a.ssid.cmp(&b.ssid));
 
-        let security = station_info.security.unwrap_or_else(|| {
-            infer_connected_security(&known_networks, &new_networks)
-                .unwrap_or_else(|| "-".to_string())
-        });
+        let mut unavailable_known_networks = Vec::new();
+        for (name, meta) in &known_meta {
+            if available_names.contains(name) {
+                continue;
+            }
+            unavailable_known_networks.push(WifiNetwork {
+                ssid: name.clone(),
+                security: meta.security.clone(),
+                signal: "-".to_string(),
+                connected: false,
+                hidden: Some(meta.hidden),
+                autoconnect: Some(meta.autoconnect),
+                available: false,
+            });
+        }
+        unavailable_known_networks.sort_by(|a, b| a.ssid.cmp(&b.ssid));
+
+        let mut hidden_networks = Vec::new();
+        if let Ok(hidden_list) = station.get_hidden_networks().await {
+            for net in hidden_list {
+                let security = net
+                    .network_type
+                    .to_string()
+                    .split("::")
+                    .last()
+                    .unwrap_or("-")
+                    .to_string();
+                hidden_networks.push(WifiNetwork {
+                    ssid: net.address,
+                    security,
+                    signal: percent_signal(net.signal_strength),
+                    connected: false,
+                    hidden: Some(true),
+                    autoconnect: None,
+                    available: false,
+                });
+            }
+            hidden_networks.sort_by(|a, b| a.ssid.cmp(&b.ssid));
+        }
+
+        let state = station
+            .state()
+            .await
+            .map(|v| v.to_string())
+            .unwrap_or_else(|_| "-".to_string());
+        let scanning = station
+            .is_scanning()
+            .await
+            .map(|v| {
+                if v {
+                    "Yes".to_string()
+                } else {
+                    "No".to_string()
+                }
+            })
+            .unwrap_or_else(|_| "-".to_string());
+
+        let powered = match session.devices().await {
+            Ok(mut devices) => {
+                if let Some(device) = devices.pop() {
+                    match device.is_powered().await {
+                        Ok(true) => "On".to_string(),
+                        Ok(false) => "Off".to_string(),
+                        Err(_) => "-".to_string(),
+                    }
+                } else {
+                    "-".to_string()
+                }
+            }
+            Err(_) => "-".to_string(),
+        };
+
+        let mut frequency = "-".to_string();
+        let mut security = "-".to_string();
+        if let Ok(mut diagnostics) = session.stations_diagnostics().await
+            && let Some(diag) = diagnostics.pop()
+            && let Ok(d) = diag.get().await
+        {
+            frequency = format!("{:.2} GHz", d.frequency_mhz as f32 / 1000.0);
+            security = d.security.to_string();
+        }
 
         Ok(WifiState {
             ifaces,
             connected_ssid,
             known_networks,
+            unavailable_known_networks,
             new_networks,
+            hidden_networks,
             device: Some(WifiDeviceInfo {
-                iface: iface.clone(),
+                iface,
                 mode: "station".to_string(),
-                powered: "On".to_string(),
-                state: station_info.state.unwrap_or_else(|| "-".to_string()),
-                scanning: station_info.scanning.unwrap_or_else(|| "-".to_string()),
-                frequency: station_info.frequency.unwrap_or_else(|| "-".to_string()),
+                powered,
+                state,
+                scanning,
+                frequency,
                 security,
             }),
         })
+    }
+
+    pub async fn scan(&self) -> Result<()> {
+        let session = Session::new().await.context("cannot access iwd service")?;
+        let station = session
+            .stations()
+            .await?
+            .pop()
+            .context("no wifi station found")?;
+        station.scan().await?;
+        Ok(())
+    }
+
+    pub async fn disconnect(&self) -> Result<()> {
+        let session = Session::new().await.context("cannot access iwd service")?;
+        let station = session
+            .stations()
+            .await?
+            .pop()
+            .context("no wifi station found")?;
+        station.disconnect().await?;
+        Ok(())
+    }
+
+    pub async fn connect(&self, ssid: &str) -> Result<()> {
+        let session = Session::new().await.context("cannot access iwd service")?;
+        let station = session
+            .stations()
+            .await?
+            .pop()
+            .context("no wifi station found")?;
+        let discovered = station.discovered_networks().await?;
+
+        for (network, _) in discovered {
+            let name = match network.name().await {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+            if name == ssid {
+                network.connect().await?;
+                return Ok(());
+            }
+        }
+
+        Err(std::io::Error::other(format!("network not found: {ssid}")).into())
+    }
+
+    pub async fn connect_hidden(&self, ssid: &str) -> Result<()> {
+        let session = Session::new().await.context("cannot access iwd service")?;
+        let station = session
+            .stations()
+            .await?
+            .pop()
+            .context("no wifi station found")?;
+        station.connect_hidden_network(ssid.to_string()).await?;
+        Ok(())
+    }
+
+    pub async fn forget_known(&self, ssid: &str) -> Result<()> {
+        let session = Session::new().await.context("cannot access iwd service")?;
+        let known = session.known_networks().await?;
+        for network in known {
+            let name = network.name().await.unwrap_or_default();
+            if name == ssid {
+                network.forget().await?;
+                return Ok(());
+            }
+        }
+        Err(std::io::Error::other(format!("known network not found: {ssid}")).into())
+    }
+
+    pub async fn toggle_autoconnect(&self, ssid: &str) -> Result<bool> {
+        let session = Session::new().await.context("cannot access iwd service")?;
+        let known = session.known_networks().await?;
+        for network in known {
+            let name = network.name().await.unwrap_or_default();
+            if name == ssid {
+                let current = network.get_autoconnect().await.unwrap_or(false);
+                let next = !current;
+                network.set_autoconnect(next).await?;
+                return Ok(next);
+            }
+        }
+        Err(std::io::Error::other(format!("known network not found: {ssid}")).into())
+    }
+}
+
+#[derive(Debug, Clone)]
+struct KnownMeta {
+    security: String,
+    hidden: bool,
+    autoconnect: bool,
+}
+
+async fn load_known_meta(session: &Session) -> HashMap<String, KnownMeta> {
+    let mut map = HashMap::new();
+    let Ok(known) = session.known_networks().await else {
+        return map;
+    };
+
+    for network in known {
+        let name = network.name().await.unwrap_or_default();
+        if name.is_empty() {
+            continue;
+        }
+        let security = network
+            .network_type()
+            .await
+            .map(|v| v.to_string())
+            .unwrap_or_else(|_| "-".to_string());
+        let hidden = network.hidden().await.unwrap_or(false);
+        let autoconnect = network.get_autoconnect().await.unwrap_or(false);
+        map.insert(
+            name,
+            KnownMeta {
+                security,
+                hidden,
+                autoconnect,
+            },
+        );
+    }
+
+    map
+}
+
+fn percent_signal(signal_dbm: i16) -> String {
+    let signal = if signal_dbm / 100 >= -50 {
+        100
+    } else {
+        2 * (100 + signal_dbm / 100)
+    };
+
+    match signal {
+        n if n >= 75 => format!("{signal:3}% 󰤨"),
+        n if (50..75).contains(&n) => format!("{signal:3}% 󰤥"),
+        n if (25..50).contains(&n) => format!("{signal:3}% 󰤢"),
+        _ => format!("{signal:3}% 󰤟"),
     }
 }
 
@@ -100,205 +336,4 @@ fn list_wifi_ifaces() -> Vec<String> {
 
     out.sort();
     out
-}
-
-fn parse_connected_network(iface: &str) -> Option<String> {
-    let out = std::process::Command::new("iwctl")
-        .arg("station")
-        .arg(iface)
-        .arg("show")
-        .output()
-        .ok()?;
-
-    if !out.status.success() {
-        return None;
-    }
-
-    let txt = String::from_utf8_lossy(&out.stdout);
-    for line in txt.lines() {
-        let line = line.trim();
-        if let Some(rest) = line.strip_prefix("Connected network") {
-            let ssid = rest.trim().trim_start_matches(':').trim();
-            if !ssid.is_empty() {
-                return Some(ssid.to_string());
-            }
-        }
-    }
-
-    None
-}
-
-fn parse_networks(iface: &str) -> Vec<WifiNetwork> {
-    let out = std::process::Command::new("iwctl")
-        .arg("station")
-        .arg(iface)
-        .arg("get-networks")
-        .output();
-
-    let Ok(out) = out else {
-        return Vec::new();
-    };
-    if !out.status.success() {
-        return Vec::new();
-    }
-
-    let txt = String::from_utf8_lossy(&out.stdout);
-    let mut nets = Vec::new();
-
-    for raw in txt.lines() {
-        let line = raw.trim();
-        if line.is_empty()
-            || line.starts_with("Available networks")
-            || line.starts_with("Network")
-            || line.starts_with("----")
-        {
-            continue;
-        }
-
-        let connected = line.starts_with('>') || line.starts_with('*');
-        let cleaned = line.trim_start_matches('>').trim_start_matches('*').trim();
-
-        let parts: Vec<&str> = cleaned.split_whitespace().collect();
-        if parts.is_empty() {
-            continue;
-        }
-
-        let ssid = parts[0].to_string();
-        let security = parts.get(1).copied().unwrap_or("-").to_string();
-        let signal = parts.last().copied().unwrap_or("-").to_string();
-
-        nets.push(WifiNetwork {
-            ssid,
-            security,
-            signal,
-            connected,
-            hidden: None,
-            autoconnect: None,
-        });
-    }
-
-    nets
-}
-
-fn parse_known_networks() -> Vec<WifiNetwork> {
-    let out = std::process::Command::new("iwctl")
-        .arg("known-networks")
-        .arg("list")
-        .output();
-
-    let Ok(out) = out else {
-        return Vec::new();
-    };
-    if !out.status.success() {
-        return Vec::new();
-    }
-
-    let txt = String::from_utf8_lossy(&out.stdout);
-    let mut nets = Vec::new();
-
-    for raw in txt.lines() {
-        let line = raw.trim();
-        if line.is_empty()
-            || line.starts_with("Known networks")
-            || line.starts_with("Name")
-            || line.starts_with("---")
-        {
-            continue;
-        }
-
-        let cleaned = line.trim_start_matches('>').trim_start_matches('*').trim();
-        let parts: Vec<&str> = cleaned.split_whitespace().collect();
-        if parts.is_empty() {
-            continue;
-        }
-
-        let ssid = parts[0].to_string();
-        let security = parts.get(1).copied().unwrap_or("-").to_string();
-        nets.push(WifiNetwork {
-            ssid,
-            security,
-            signal: "-".to_string(),
-            connected: false,
-            hidden: None,
-            autoconnect: None,
-        });
-    }
-
-    nets
-}
-
-#[derive(Default)]
-struct StationInfo {
-    state: Option<String>,
-    scanning: Option<String>,
-    frequency: Option<String>,
-    security: Option<String>,
-}
-
-fn parse_station_info(iface: &str) -> StationInfo {
-    let out = std::process::Command::new("iwctl")
-        .arg("station")
-        .arg(iface)
-        .arg("show")
-        .output();
-
-    let Ok(out) = out else {
-        return StationInfo::default();
-    };
-    if !out.status.success() {
-        return StationInfo::default();
-    }
-
-    let txt = String::from_utf8_lossy(&out.stdout);
-    let mut info = StationInfo::default();
-
-    for raw in txt.lines() {
-        let line = raw.trim();
-        if let Some(v) = value_after_key(line, "State") {
-            info.state = Some(v.to_string());
-        } else if let Some(v) = value_after_key(line, "Scanning") {
-            info.scanning = Some(v.to_string());
-        } else if let Some(v) = value_after_key(line, "Frequency") {
-            info.frequency = Some(v.to_string());
-        } else if let Some(v) = value_after_key(line, "Security") {
-            info.security = Some(v.to_string());
-        }
-    }
-
-    info
-}
-
-fn value_after_key<'a>(line: &'a str, key: &str) -> Option<&'a str> {
-    if !line.starts_with(key) {
-        return None;
-    }
-    let mut rest = &line[key.len()..];
-    rest = rest.trim();
-    if let Some(stripped) = rest.strip_prefix(':') {
-        rest = stripped.trim();
-    }
-    if rest.is_empty() { None } else { Some(rest) }
-}
-
-fn infer_connected_security(known: &[WifiNetwork], new: &[WifiNetwork]) -> Option<String> {
-    known
-        .iter()
-        .find(|n| n.connected)
-        .map(|n| n.security.clone())
-        .or_else(|| new.iter().find(|n| n.connected).map(|n| n.security.clone()))
-}
-
-async fn run_iwctl(args: &[&str]) -> Result<()> {
-    let out = Command::new("iwctl").args(args).output().await?;
-    if out.status.success() {
-        return Ok(());
-    }
-
-    let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
-    Err(std::io::Error::other(if stderr.is_empty() {
-        "iwctl failed".to_string()
-    } else {
-        stderr
-    })
-    .into())
 }

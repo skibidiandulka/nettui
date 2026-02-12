@@ -24,11 +24,14 @@ pub fn render(app: &mut App, frame: &mut Frame, area: Rect) {
     if app.show_wifi_details {
         render_details_popup(app, frame);
     }
+    if app.hidden_connect_prompt {
+        render_hidden_connect_popup(app, frame);
+    }
 }
 
 fn render_known_networks(app: &mut App, frame: &mut Frame, area: Rect) {
     let focused = app.wifi_focus == WifiFocus::KnownNetworks;
-    let rows: Vec<Row> = app
+    let mut rows: Vec<Row> = app
         .wifi
         .known_networks
         .iter()
@@ -47,24 +50,57 @@ fn render_known_networks(app: &mut App, frame: &mut Frame, area: Rect) {
                         .map(|v| if v { "Yes" } else { "No" })
                         .unwrap_or("-"),
                 ),
+                Cell::from(n.signal.clone()),
             ])
         })
         .collect();
+
+    if app.show_unavailable_known_networks {
+        for n in &app.wifi.unavailable_known_networks {
+            rows.push(
+                Row::new(vec![
+                    Cell::from(""),
+                    Cell::from(n.ssid.clone()),
+                    Cell::from(n.security.clone()),
+                    Cell::from(
+                        n.hidden
+                            .map(|v| if v { "Yes" } else { "No" })
+                            .unwrap_or("-"),
+                    ),
+                    Cell::from(
+                        n.autoconnect
+                            .map(|v| if v { "Yes" } else { "No" })
+                            .unwrap_or("-"),
+                    ),
+                    Cell::from("-"),
+                ])
+                .dark_gray(),
+            );
+        }
+    }
 
     let table = Table::new(
         rows,
         [
             Constraint::Length(2),
-            Constraint::Length(30),
+            Constraint::Length(28),
             Constraint::Length(10),
             Constraint::Length(8),
             Constraint::Length(14),
+            Constraint::Length(10),
         ],
     )
     .header(
-        Row::new(vec!["", "Name", "Security", "Hidden", "Auto Connect"])
-            .style(Style::default().fg(Color::Yellow).bold())
-            .bottom_margin(1),
+        Row::new(vec![
+            "",
+            "Name",
+            "Security",
+            "Hidden",
+            "Auto Connect",
+            "Signal",
+        ])
+        .style(Style::default().fg(Color::Yellow).bold())
+        .bottom_margin(1),
     )
     .block(section_block(" Known Networks ", focused))
     .row_highlight_style(if focused {
@@ -78,7 +114,7 @@ fn render_known_networks(app: &mut App, frame: &mut Frame, area: Rect) {
 
 fn render_new_networks(app: &mut App, frame: &mut Frame, area: Rect) {
     let focused = app.wifi_focus == WifiFocus::NewNetworks;
-    let rows: Vec<Row> = app
+    let mut rows: Vec<Row> = app
         .wifi
         .new_networks
         .iter()
@@ -91,10 +127,23 @@ fn render_new_networks(app: &mut App, frame: &mut Frame, area: Rect) {
         })
         .collect();
 
+    if app.show_hidden_networks {
+        for n in &app.wifi.hidden_networks {
+            rows.push(
+                Row::new(vec![
+                    Cell::from(n.ssid.clone()),
+                    Cell::from(n.security.clone()),
+                    Cell::from(n.signal.clone()),
+                ])
+                .dark_gray(),
+            );
+        }
+    }
+
     let table = Table::new(
         rows,
         [
-            Constraint::Length(30),
+            Constraint::Length(34),
             Constraint::Length(12),
             Constraint::Length(10),
         ],
@@ -124,7 +173,7 @@ fn render_device(app: &mut App, frame: &mut Frame, area: Rect) {
             .cloned()
             .unwrap_or_else(|| "-".to_string()),
         mode: "station".to_string(),
-        powered: "On".to_string(),
+        powered: "-".to_string(),
         state: "-".to_string(),
         scanning: "-".to_string(),
         frequency: "-".to_string(),
@@ -173,7 +222,7 @@ fn render_device(app: &mut App, frame: &mut Frame, area: Rect) {
         Style::default()
     });
 
-    frame.render_widget(table, area);
+    frame.render_stateful_widget(table, area, &mut app.wifi_adapter_state);
 }
 
 fn section_block(title: &str, focused: bool) -> Block<'_> {
@@ -187,6 +236,37 @@ fn section_block(title: &str, focused: bool) -> Block<'_> {
         .borders(Borders::ALL)
         .border_type(BorderType::Thick)
         .border_style(Style::default().fg(border))
+}
+
+fn render_hidden_connect_popup(app: &App, frame: &mut Frame) {
+    let area = centered_rect(58, 28, frame.area());
+    frame.render_widget(Clear, area);
+
+    let block = Block::default()
+        .title(" Connect Hidden Network ")
+        .borders(Borders::ALL)
+        .border_type(BorderType::Thick)
+        .border_style(Style::default().fg(Color::Blue));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let content = vec![
+        Line::from("Enter hidden SSID"),
+        Line::from(""),
+        Line::from(vec![
+            Span::from("SSID: ").bold(),
+            Span::from(app.hidden_ssid_input.clone()),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::from("Enter").bold(),
+            Span::from(" connect"),
+            Span::from(" | "),
+            Span::from("Esc").bold(),
+            Span::from(" cancel"),
+        ]),
+    ];
+    frame.render_widget(Paragraph::new(content), inner);
 }
 
 fn render_details_popup(app: &App, frame: &mut Frame) {

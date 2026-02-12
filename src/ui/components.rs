@@ -1,6 +1,6 @@
 use crate::{
     app::App,
-    domain::common::{ActiveTab, ToastKind},
+    domain::common::{ActiveTab, ToastKind, WifiFocus},
 };
 use ratatui::{
     Frame,
@@ -57,15 +57,45 @@ pub fn render_footer(app: &App, frame: &mut Frame, area: Rect) {
                 Span::from("Tab").bold(),
                 Span::from(" section"),
                 Span::from(" | "),
-                Span::from("s").bold(),
-                Span::from(" scan"),
-                Span::from(" | "),
-                Span::from("Enter").bold(),
-                Span::from(" dis/connect"),
-                Span::from(" | "),
-                Span::from("i").bold(),
-                Span::from(" details"),
             ]);
+            match app.wifi_focus {
+                WifiFocus::KnownNetworks => spans.extend([
+                    Span::from("Enter").bold(),
+                    Span::from(" dis/connect"),
+                    Span::from(" | "),
+                    Span::from("a").bold(),
+                    Span::from(" show all"),
+                    Span::from(" | "),
+                    Span::from("d").bold(),
+                    Span::from(" forget"),
+                    Span::from(" | "),
+                    Span::from("t").bold(),
+                    Span::from(" autoconnect"),
+                    Span::from(" | "),
+                    Span::from("s").bold(),
+                    Span::from(" scan"),
+                ]),
+                WifiFocus::NewNetworks => spans.extend([
+                    Span::from("Enter").bold(),
+                    Span::from(" connect"),
+                    Span::from(" | "),
+                    Span::from("a").bold(),
+                    Span::from(" show all"),
+                    Span::from(" | "),
+                    Span::from("n").bold(),
+                    Span::from(" hidden"),
+                    Span::from(" | "),
+                    Span::from("s").bold(),
+                    Span::from(" scan"),
+                ]),
+                WifiFocus::Adapter => spans.extend([
+                    Span::from("s").bold(),
+                    Span::from(" scan"),
+                    Span::from(" | "),
+                    Span::from("i").bold(),
+                    Span::from(" details"),
+                ]),
+            }
         }
         ActiveTab::Ethernet => {
             spans.extend([Span::from("n").bold(), Span::from(" renew DHCP")]);

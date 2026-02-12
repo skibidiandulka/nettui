@@ -1,8 +1,24 @@
-use crate::{app::App, domain::common::ActiveTab};
+use crate::{
+    app::App,
+    domain::common::{ActiveTab, WifiFocus},
+};
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> Result<()> {
+    if app.hidden_connect_prompt {
+        match key_event.code {
+            KeyCode::Esc => app.close_hidden_connect_prompt(),
+            KeyCode::Enter => app.submit_hidden_connect().await,
+            KeyCode::Backspace => app.hidden_input_backspace(),
+            KeyCode::Char(c) if !key_event.modifiers.contains(KeyModifiers::CONTROL) => {
+                app.hidden_input_push(c)
+            }
+            _ => {}
+        }
+        return Ok(());
+    }
+
     match key_event.code {
         KeyCode::Char('q') => app.quit(),
         KeyCode::Esc if app.config.esc_quit => app.quit(),
@@ -23,20 +39,48 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> Result<()>
 
         KeyCode::Char('s') if app.active_tab == ActiveTab::Wifi => {
             app.clear_error();
-            if let Err(e) = app.wifi_scan().await {
-                app.last_error = Some(e.to_string());
-            } else {
-                app.refresh_current().await;
-            }
+            app.wifi_scan().await?;
+            app.refresh_current().await;
         }
 
-        KeyCode::Enter if app.active_tab == ActiveTab::Wifi => {
+        KeyCode::Char('a') if app.active_tab == ActiveTab::Wifi => match app.wifi_focus {
+            WifiFocus::KnownNetworks => app.toggle_known_show_all(),
+            WifiFocus::NewNetworks => app.toggle_new_show_all(),
+            WifiFocus::Adapter => {}
+        },
+
+        KeyCode::Char('d')
+            if app.active_tab == ActiveTab::Wifi && app.wifi_focus == WifiFocus::KnownNetworks =>
+        {
             app.clear_error();
-            if let Err(e) = app.wifi_connect_or_disconnect().await {
-                app.last_error = Some(e.to_string());
-            } else {
-                app.refresh_current().await;
-            }
+            app.wifi_forget_selected().await?;
+            app.refresh_current().await;
+        }
+
+        KeyCode::Char('t')
+            if app.active_tab == ActiveTab::Wifi && app.wifi_focus == WifiFocus::KnownNetworks =>
+        {
+            app.clear_error();
+            app.wifi_toggle_autoconnect_selected().await?;
+            app.refresh_current().await;
+        }
+
+        KeyCode::Char('n')
+            if app.active_tab == ActiveTab::Wifi && app.wifi_focus == WifiFocus::NewNetworks =>
+        {
+            app.open_hidden_connect_prompt();
+        }
+
+        KeyCode::Enter | KeyCode::Char(' ')
+            if app.active_tab == ActiveTab::Wifi
+                && matches!(
+                    app.wifi_focus,
+                    WifiFocus::KnownNetworks | WifiFocus::NewNetworks
+                ) =>
+        {
+            app.clear_error();
+            app.wifi_connect_or_disconnect().await?;
+            app.refresh_current().await;
         }
 
         KeyCode::Char('i') if app.active_tab == ActiveTab::Wifi => {

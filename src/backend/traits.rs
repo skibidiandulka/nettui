@@ -1,4 +1,4 @@
-use crate::domain::{ethernet::EthernetIface, wifi::WifiState};
+use crate::domain::ethernet::EthernetIface;
 use anyhow::Result;
 
 #[derive(Debug, Clone)]
@@ -9,10 +9,6 @@ pub struct CommandResult {
     pub status: i32,
     pub stdout: String,
     pub stderr: String,
-}
-
-pub trait WifiBackend {
-    fn query_state(&self) -> Result<WifiState>;
 }
 
 pub trait EthernetBackend {

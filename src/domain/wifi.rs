@@ -6,6 +6,7 @@ pub struct WifiNetwork {
     pub connected: bool,
     pub hidden: Option<bool>,
     pub autoconnect: Option<bool>,
+    pub available: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -24,7 +25,9 @@ pub struct WifiState {
     pub ifaces: Vec<String>,
     pub connected_ssid: Option<String>,
     pub known_networks: Vec<WifiNetwork>,
+    pub unavailable_known_networks: Vec<WifiNetwork>,
     pub new_networks: Vec<WifiNetwork>,
+    pub hidden_networks: Vec<WifiNetwork>,
     pub device: Option<WifiDeviceInfo>,
 }
 
@@ -34,7 +37,9 @@ impl WifiState {
             ifaces: Vec::new(),
             connected_ssid: None,
             known_networks: Vec::new(),
+            unavailable_known_networks: Vec::new(),
             new_networks: Vec::new(),
+            hidden_networks: Vec::new(),
             device: None,
         }
     }
