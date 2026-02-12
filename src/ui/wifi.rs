@@ -24,6 +24,9 @@ pub fn render(app: &mut App, frame: &mut Frame, area: Rect) {
     if app.show_wifi_details {
         render_details_popup(app, frame);
     }
+    if app.wifi_passphrase_prompt_ssid.is_some() {
+        render_wifi_passphrase_popup(app, frame);
+    }
     if app.hidden_connect_prompt {
         render_hidden_connect_popup(app, frame);
     }
@@ -31,6 +34,11 @@ pub fn render(app: &mut App, frame: &mut Frame, area: Rect) {
 
 fn render_known_networks(app: &mut App, frame: &mut Frame, area: Rect) {
     let focused = app.wifi_focus == WifiFocus::KnownNetworks;
+    let title = if app.wifi_connect_active() {
+        format!(" Known Networks (Connecting {}) ", app.spinner_glyph())
+    } else {
+        " Known Networks ".to_string()
+    };
     let mut rows: Vec<Row> = app
         .wifi
         .known_networks
@@ -102,7 +110,7 @@ fn render_known_networks(app: &mut App, frame: &mut Frame, area: Rect) {
         .style(Style::default().fg(Color::Yellow).bold())
         .bottom_margin(1),
     )
-    .block(section_block(" Known Networks ", focused))
+    .block(section_block(&title, focused))
     .row_highlight_style(if focused {
         Style::default().bg(Color::DarkGray).fg(Color::White)
     } else {
@@ -114,6 +122,13 @@ fn render_known_networks(app: &mut App, frame: &mut Frame, area: Rect) {
 
 fn render_new_networks(app: &mut App, frame: &mut Frame, area: Rect) {
     let focused = app.wifi_focus == WifiFocus::NewNetworks;
+    let title = if app.wifi_scanning_active() {
+        format!(" New Networks (Scanning {}) ", app.spinner_glyph())
+    } else if app.wifi_connect_active() {
+        format!(" New Networks (Connecting {}) ", app.spinner_glyph())
+    } else {
+        " New Networks ".to_string()
+    };
     let mut rows: Vec<Row> = app
         .wifi
         .new_networks
@@ -153,7 +168,7 @@ fn render_new_networks(app: &mut App, frame: &mut Frame, area: Rect) {
             .style(Style::default().fg(Color::Yellow).bold())
             .bottom_margin(1),
     )
-    .block(section_block(" New Networks ", focused))
+    .block(section_block(&title, focused))
     .row_highlight_style(if focused {
         Style::default().bg(Color::DarkGray).fg(Color::White)
     } else {
@@ -266,6 +281,43 @@ fn render_hidden_connect_popup(app: &App, frame: &mut Frame) {
             Span::from(" cancel"),
         ]),
     ];
+    frame.render_widget(Paragraph::new(content), inner);
+}
+
+fn render_wifi_passphrase_popup(app: &App, frame: &mut Frame) {
+    let Some(ssid) = app.wifi_passphrase_prompt_ssid.clone() else {
+        return;
+    };
+
+    let area = centered_rect(62, 32, frame.area());
+    frame.render_widget(Clear, area);
+
+    let block = Block::default()
+        .title(" Wi-Fi Passphrase ")
+        .borders(Borders::ALL)
+        .border_type(BorderType::Thick)
+        .border_style(Style::default().fg(Color::Blue));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let masked = "*".repeat(app.wifi_passphrase_input.chars().count());
+    let content = vec![
+        Line::from(vec![
+            Span::from("SSID: ").bold(),
+            Span::from(ssid).fg(Color::Cyan),
+        ]),
+        Line::from(""),
+        Line::from(vec![Span::from("Passphrase: ").bold(), Span::from(masked)]),
+        Line::from(""),
+        Line::from(vec![
+            Span::from("Enter").bold(),
+            Span::from(" connect"),
+            Span::from(" | "),
+            Span::from("Esc").bold(),
+            Span::from(" cancel"),
+        ]),
+    ];
+
     frame.render_widget(Paragraph::new(content), inner);
 }
 

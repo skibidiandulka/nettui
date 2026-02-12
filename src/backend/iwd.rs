@@ -2,6 +2,7 @@ use crate::domain::wifi::{WifiDeviceInfo, WifiNetwork, WifiState};
 use anyhow::{Context, Result};
 use iwdrs::session::Session;
 use std::{collections::HashMap, fs, path::Path};
+use tokio::process::Command;
 
 pub struct IwdBackend;
 
@@ -232,6 +233,38 @@ impl IwdBackend {
             .context("no wifi station found")?;
         station.connect_hidden_network(ssid.to_string()).await?;
         Ok(())
+    }
+
+    pub async fn connect_with_passphrase(&self, ssid: &str, passphrase: &str) -> Result<()> {
+        let iface = list_wifi_ifaces()
+            .into_iter()
+            .next()
+            .context("no wifi adapter found")?;
+
+        let out = Command::new("iwctl")
+            .arg("--passphrase")
+            .arg(passphrase)
+            .arg("station")
+            .arg(&iface)
+            .arg("connect")
+            .arg(ssid)
+            .output()
+            .await
+            .context("failed to run iwctl")?;
+
+        if out.status.success() {
+            return Ok(());
+        }
+
+        let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+        let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        let msg = if !stderr.is_empty() { stderr } else { stdout };
+        Err(std::io::Error::other(if msg.is_empty() {
+            "iwctl connect failed".to_string()
+        } else {
+            msg
+        })
+        .into())
     }
 
     pub async fn forget_known(&self, ssid: &str) -> Result<()> {

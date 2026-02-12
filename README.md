@@ -11,8 +11,9 @@ but with one app shell and switchable Wi-Fi/Ethernet panels.
 - Startup tab policy: prefer active transport (`Ethernet` if active, else `Wi-Fi` if active)
 - Wi-Fi (iwd via D-Bus / `iwdrs`):
   - split sections: `Known Networks`, `New Networks`, `Device`
-  - scan
+  - non-blocking scan/connect with spinner in section titles
   - connect/disconnect selected network
+  - fallback passphrase prompt when iwd reports `No Agent registered`
   - forget known network
   - toggle autoconnect
   - show/hide unavailable known and hidden network entries
@@ -20,6 +21,7 @@ but with one app shell and switchable Wi-Fi/Ethernet panels.
   - detail popup for active Wi-Fi interface (`i`)
 - Ethernet (systemd-networkd):
   - list interfaces and details
+  - toggle link admin state up/down (`ip link set`)
   - DHCP renew (`networkctl renew`)
 - Toast/error popups and terminal size guard
 
@@ -57,6 +59,7 @@ Wi-Fi tab:
 - `Tab` / `Shift+Tab`: switch focus (`Known` / `New` / `Device`)
 - `s`: scan
 - `Enter`: connect/disconnect selected network
+- `Enter` in passphrase popup: connect with passphrase
 - `a`: show/hide additional entries (`Known`: unavailable, `New`: hidden)
 - `d`: forget selected known network
 - `t`: toggle autoconnect for selected known network
@@ -65,6 +68,7 @@ Wi-Fi tab:
 
 Ethernet tab:
 
+- `Enter`: toggle selected interface link (`up/down`)
 - `n`: renew DHCP on selected interface
 
 ## Build

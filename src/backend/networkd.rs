@@ -74,6 +74,85 @@ impl NetworkdBackend {
         Err(std::io::Error::other("failed to run networkctl").into())
     }
 
+    pub async fn set_link_admin_state(&self, iface: &str, up: bool) -> Result<CommandResult> {
+        let state_arg = if up { "up" } else { "down" };
+
+        if let Ok(out) = Command::new("ip")
+            .arg("link")
+            .arg("set")
+            .arg("dev")
+            .arg(iface)
+            .arg(state_arg)
+            .output()
+            .await
+        {
+            if out.status.success() {
+                return Ok(CommandResult {
+                    program: "ip".to_string(),
+                    args: vec![
+                        "link".to_string(),
+                        "set".to_string(),
+                        "dev".to_string(),
+                        iface.to_string(),
+                        state_arg.to_string(),
+                    ],
+                    used_sudo: false,
+                    status: out.status.code().unwrap_or(0),
+                    stdout: String::from_utf8_lossy(&out.stdout).trim().to_string(),
+                    stderr: String::from_utf8_lossy(&out.stderr).trim().to_string(),
+                });
+            }
+
+            let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+            if stderr.contains("Operation not permitted")
+                || stderr.contains("Permission denied")
+                || out.status.code() == Some(1)
+            {
+                let sudo_out = Command::new("sudo")
+                    .arg("-n")
+                    .arg("ip")
+                    .arg("link")
+                    .arg("set")
+                    .arg("dev")
+                    .arg(iface)
+                    .arg(state_arg)
+                    .output()
+                    .await?;
+
+                if sudo_out.status.success() {
+                    return Ok(CommandResult {
+                        program: "ip".to_string(),
+                        args: vec![
+                            "link".to_string(),
+                            "set".to_string(),
+                            "dev".to_string(),
+                            iface.to_string(),
+                            state_arg.to_string(),
+                        ],
+                        used_sudo: true,
+                        status: sudo_out.status.code().unwrap_or(0),
+                        stdout: String::from_utf8_lossy(&sudo_out.stdout).trim().to_string(),
+                        stderr: String::from_utf8_lossy(&sudo_out.stderr).trim().to_string(),
+                    });
+                }
+
+                return Err(std::io::Error::other(
+                    String::from_utf8_lossy(&sudo_out.stderr).trim().to_string(),
+                )
+                .into());
+            }
+
+            return Err(std::io::Error::other(if stderr.is_empty() {
+                format!("ip link set dev {iface} {state_arg} failed")
+            } else {
+                stderr
+            })
+            .into());
+        }
+
+        Err(std::io::Error::other("failed to run ip").into())
+    }
+
     pub fn iface_details(&self, iface: &str) -> Result<EthernetIface> {
         let base = Path::new("/sys/class/net").join(iface);
         if !base.exists() {

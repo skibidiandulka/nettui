@@ -10,7 +10,7 @@ use ratatui::{
 
 pub fn render(app: &mut App, frame: &mut Frame) {
     const MIN_W: u16 = 126;
-    const MIN_H: u16 = 26;
+    const MIN_H: u16 = 27;
 
     let area = frame.area();
     if area.width < MIN_W || area.height < MIN_H {
@@ -23,7 +23,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         .constraints([
             Constraint::Length(3), // tabs
             Constraint::Min(10),   // content
-            Constraint::Length(2), // footer
+            Constraint::Length(3), // footer
         ])
         .margin(1)
         .split(area);

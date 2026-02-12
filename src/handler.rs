@@ -6,6 +6,19 @@ use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> Result<()> {
+    if app.wifi_passphrase_prompt_ssid.is_some() {
+        match key_event.code {
+            KeyCode::Esc => app.close_wifi_passphrase_prompt(),
+            KeyCode::Enter => app.submit_wifi_passphrase_connect().await,
+            KeyCode::Backspace => app.passphrase_input_backspace(),
+            KeyCode::Char(c) if !key_event.modifiers.contains(KeyModifiers::CONTROL) => {
+                app.passphrase_input_push(c)
+            }
+            _ => {}
+        }
+        return Ok(());
+    }
+
     if app.hidden_connect_prompt {
         match key_event.code {
             KeyCode::Esc => app.close_hidden_connect_prompt(),
@@ -90,6 +103,15 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> Result<()>
         KeyCode::Char('n') if app.active_tab == ActiveTab::Ethernet => {
             app.clear_error();
             if let Err(e) = app.ethernet_renew_dhcp().await {
+                app.last_error = Some(e.to_string());
+            } else {
+                app.refresh_current().await;
+            }
+        }
+
+        KeyCode::Enter if app.active_tab == ActiveTab::Ethernet => {
+            app.clear_error();
+            if let Err(e) = app.ethernet_toggle_link().await {
                 app.last_error = Some(e.to_string());
             } else {
                 app.refresh_current().await;

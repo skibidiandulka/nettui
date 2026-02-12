@@ -33,7 +33,7 @@ pub fn render_tabs(app: &App, frame: &mut Frame, area: Rect) {
 }
 
 pub fn render_footer(app: &App, frame: &mut Frame, area: Rect) {
-    let mut spans = vec![
+    let mut line1 = vec![
         Span::from("h,←").bold(),
         Span::from(" Prev tab"),
         Span::from(" | "),
@@ -48,67 +48,73 @@ pub fn render_footer(app: &App, frame: &mut Frame, area: Rect) {
         Span::from(" | "),
         Span::from("r").bold(),
         Span::from(" refresh"),
-        Span::from(" | "),
     ];
+    if app.active_tab == ActiveTab::Wifi {
+        line1.extend([
+            Span::from(" | "),
+            Span::from("Tab").bold(),
+            Span::from(" section"),
+        ]);
+    }
 
+    let mut line2: Vec<Span> = Vec::new();
     match app.active_tab {
-        ActiveTab::Wifi => {
-            spans.extend([
-                Span::from("Tab").bold(),
-                Span::from(" section"),
+        ActiveTab::Wifi => match app.wifi_focus {
+            WifiFocus::KnownNetworks => line2.extend([
+                Span::from("Enter").bold(),
+                Span::from(" dis/connect"),
                 Span::from(" | "),
-            ]);
-            match app.wifi_focus {
-                WifiFocus::KnownNetworks => spans.extend([
-                    Span::from("Enter").bold(),
-                    Span::from(" dis/connect"),
-                    Span::from(" | "),
-                    Span::from("a").bold(),
-                    Span::from(" show all"),
-                    Span::from(" | "),
-                    Span::from("d").bold(),
-                    Span::from(" forget"),
-                    Span::from(" | "),
-                    Span::from("t").bold(),
-                    Span::from(" autoconnect"),
-                    Span::from(" | "),
-                    Span::from("s").bold(),
-                    Span::from(" scan"),
-                ]),
-                WifiFocus::NewNetworks => spans.extend([
-                    Span::from("Enter").bold(),
-                    Span::from(" connect"),
-                    Span::from(" | "),
-                    Span::from("a").bold(),
-                    Span::from(" show all"),
-                    Span::from(" | "),
-                    Span::from("n").bold(),
-                    Span::from(" hidden"),
-                    Span::from(" | "),
-                    Span::from("s").bold(),
-                    Span::from(" scan"),
-                ]),
-                WifiFocus::Adapter => spans.extend([
-                    Span::from("s").bold(),
-                    Span::from(" scan"),
-                    Span::from(" | "),
-                    Span::from("i").bold(),
-                    Span::from(" details"),
-                ]),
-            }
-        }
+                Span::from("a").bold(),
+                Span::from(" show all"),
+                Span::from(" | "),
+                Span::from("d").bold(),
+                Span::from(" forget"),
+                Span::from(" | "),
+                Span::from("t").bold(),
+                Span::from(" autoconnect"),
+                Span::from(" | "),
+                Span::from("s").bold(),
+                Span::from(" scan"),
+            ]),
+            WifiFocus::NewNetworks => line2.extend([
+                Span::from("Enter").bold(),
+                Span::from(" connect"),
+                Span::from(" | "),
+                Span::from("a").bold(),
+                Span::from(" show all"),
+                Span::from(" | "),
+                Span::from("n").bold(),
+                Span::from(" hidden"),
+                Span::from(" | "),
+                Span::from("s").bold(),
+                Span::from(" scan"),
+            ]),
+            WifiFocus::Adapter => line2.extend([
+                Span::from("s").bold(),
+                Span::from(" scan"),
+                Span::from(" | "),
+                Span::from("i").bold(),
+                Span::from(" details"),
+            ]),
+        },
         ActiveTab::Ethernet => {
-            spans.extend([Span::from("n").bold(), Span::from(" renew DHCP")]);
+            line2.extend([
+                Span::from("Enter").bold(),
+                Span::from(" link up/down"),
+                Span::from(" | "),
+                Span::from("n").bold(),
+                Span::from(" renew DHCP"),
+            ]);
         }
     }
 
-    spans.extend([
+    line2.extend([
         Span::from(" | "),
         Span::from("q").bold(),
         Span::from(" quit"),
     ]);
 
-    let p = Paragraph::new(Line::from(spans))
+    let p = Paragraph::new(vec![Line::from(line1), Line::from(line2)])
         .alignment(Alignment::Center)
         .style(Style::default().fg(Color::Blue));
     frame.render_widget(p, area);
