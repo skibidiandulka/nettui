@@ -24,6 +24,20 @@ but with one app shell and switchable Wi-Fi/Ethernet panels.
 - Wi-Fi backend: `iwd` (`iwctl` available)
 - Ethernet backend: `systemd-networkd` (`networkctl` available)
 
+## Installation
+
+From AUR:
+
+```bash
+yay -S nettui
+```
+
+or prebuilt binary package:
+
+```bash
+yay -S nettui-bin
+```
+
 ## Controls
 
 Global:
