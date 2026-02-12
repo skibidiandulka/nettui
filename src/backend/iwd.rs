@@ -3,6 +3,7 @@ use crate::{
     domain::wifi::{WifiNetwork, WifiState},
 };
 use anyhow::Result;
+use std::collections::HashSet;
 use std::{fs, path::Path};
 use tokio::process::Command;
 
@@ -35,20 +36,31 @@ impl WifiBackend for IwdBackend {
 
         let iface = ifaces[0].clone();
         let connected_ssid = parse_connected_network(&iface);
-        let mut networks = parse_networks(&iface);
+        let mut known_networks = parse_known_networks();
+        let mut new_networks = parse_networks(&iface);
 
         if let Some(conn) = &connected_ssid {
-            for n in &mut networks {
+            for n in &mut known_networks {
+                if &n.ssid == conn {
+                    n.connected = true;
+                }
+            }
+            for n in &mut new_networks {
                 if &n.ssid == conn {
                     n.connected = true;
                 }
             }
         }
 
+        // Keep "new networks" focused on unknown SSIDs for UX consistency with impala.
+        let known_ssids: HashSet<&str> = known_networks.iter().map(|n| n.ssid.as_str()).collect();
+        new_networks.retain(|n| !known_ssids.contains(n.ssid.as_str()));
+
         Ok(WifiState {
             ifaces,
             connected_ssid,
-            networks,
+            known_networks,
+            new_networks,
         })
     }
 }
@@ -145,6 +157,51 @@ fn parse_networks(iface: &str) -> Vec<WifiNetwork> {
             security,
             signal,
             connected,
+        });
+    }
+
+    nets
+}
+
+fn parse_known_networks() -> Vec<WifiNetwork> {
+    let out = std::process::Command::new("iwctl")
+        .arg("known-networks")
+        .arg("list")
+        .output();
+
+    let Ok(out) = out else {
+        return Vec::new();
+    };
+    if !out.status.success() {
+        return Vec::new();
+    }
+
+    let txt = String::from_utf8_lossy(&out.stdout);
+    let mut nets = Vec::new();
+
+    for raw in txt.lines() {
+        let line = raw.trim();
+        if line.is_empty()
+            || line.starts_with("Known networks")
+            || line.starts_with("Name")
+            || line.starts_with("---")
+        {
+            continue;
+        }
+
+        let cleaned = line.trim_start_matches('>').trim_start_matches('*').trim();
+        let parts: Vec<&str> = cleaned.split_whitespace().collect();
+        if parts.is_empty() {
+            continue;
+        }
+
+        let ssid = parts[0].to_string();
+        let security = parts.get(1).copied().unwrap_or("-").to_string();
+        nets.push(WifiNetwork {
+            ssid,
+            security,
+            signal: "-".to_string(),
+            connected: false,
         });
     }
 

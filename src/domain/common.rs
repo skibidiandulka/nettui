@@ -6,6 +6,13 @@ pub enum ActiveTab {
     Ethernet,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WifiFocus {
+    KnownNetworks,
+    NewNetworks,
+    Adapter,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum StartupTabPolicy {
     PreferActive,

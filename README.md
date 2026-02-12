@@ -7,12 +7,13 @@ but with one app shell and switchable Wi-Fi/Ethernet panels.
 
 ## Scope (v0.1)
 
-- One TUI with two tabs: `Wi-Fi` and `Ethernet`
+- One TUI with two transport tabs: `Wi-Fi` and `Ethernet`
 - Startup tab policy: prefer active transport (`Ethernet` if active, else `Wi-Fi` if active)
 - Wi-Fi (iwd/iwctl):
-  - list networks
+  - split sections: `Known Networks`, `New Networks`, `Adapter`
   - scan
   - connect/disconnect selected network
+  - detail popup for active Wi-Fi interface (`i`)
 - Ethernet (systemd-networkd):
   - list interfaces and details
   - DHCP renew (`networkctl renew`)
@@ -42,15 +43,17 @@ yay -S nettui-bin
 
 Global:
 
-- `Tab` / `Shift+Tab` or `h/l`: switch tab
+- `h/l` or `←/→`: switch transport tab (`Wi-Fi` / `Ethernet`)
 - `j/k` or `↓/↑`: move selection
 - `r`: refresh
 - `q` (or `Esc`): quit
 
 Wi-Fi tab:
 
+- `Tab` / `Shift+Tab`: switch focus (`Known` / `New` / `Adapter`)
 - `s`: scan
 - `Enter`: connect/disconnect selected network
+- `i`: toggle Wi-Fi details popup
 
 Ethernet tab:
 

@@ -5,7 +5,7 @@ use crate::{
         traits::{EthernetBackend, WifiBackend},
     },
     domain::{
-        common::{ActiveTab, StartupTabPolicy, Toast, ToastKind},
+        common::{ActiveTab, StartupTabPolicy, Toast, ToastKind, WifiFocus},
         ethernet::{EthernetIface, EthernetState},
         wifi::{WifiNetwork, WifiState},
     },
@@ -36,9 +36,14 @@ pub struct App {
     pub running: bool,
     pub config: AppConfig,
     pub active_tab: ActiveTab,
+    pub wifi_focus: WifiFocus,
 
     pub wifi: WifiState,
-    pub wifi_state: TableState,
+    pub wifi_known_state: TableState,
+    pub wifi_new_state: TableState,
+    pub wifi_adapter_state: TableState,
+    pub wifi_iface_details: Option<EthernetIface>,
+    pub show_wifi_details: bool,
 
     pub ethernet: EthernetState,
     pub ethernet_state: TableState,
@@ -62,37 +67,36 @@ impl App {
         let ethernet = EthernetState {
             ifaces: eth_backend.list_ifaces().unwrap_or_default(),
         };
+        let wifi_iface_details = wifi
+            .ifaces
+            .first()
+            .and_then(|iface| eth_backend.iface_details(iface).ok());
 
         let active_tab = determine_start_tab(config.startup_policy, &wifi, &ethernet);
 
-        let mut wifi_state = TableState::default();
-        if wifi.networks.is_empty() {
-            wifi_state.select(None);
-        } else {
-            wifi_state.select(Some(0));
-        }
-
-        let mut ethernet_state = TableState::default();
-        if ethernet.ifaces.is_empty() {
-            ethernet_state.select(None);
-        } else {
-            ethernet_state.select(Some(0));
-        }
-
-        Ok(Self {
+        let mut app = Self {
             running: true,
             config,
             active_tab,
+            wifi_focus: WifiFocus::KnownNetworks,
             wifi,
-            wifi_state,
+            wifi_known_state: TableState::default(),
+            wifi_new_state: TableState::default(),
+            wifi_adapter_state: TableState::default(),
+            wifi_iface_details,
+            show_wifi_details: false,
             ethernet,
-            ethernet_state,
+            ethernet_state: TableState::default(),
             last_error: None,
             last_action: None,
             toast: None,
             wifi_backend,
             eth_backend,
-        })
+        };
+
+        app.init_wifi_states();
+        app.init_ethernet_state();
+        Ok(app)
     }
 
     pub async fn tick(&mut self) -> Result<()> {
@@ -107,32 +111,26 @@ impl App {
     }
 
     async fn refresh_all(&mut self) {
+        let known_ssid = self.selected_known_ssid();
+        let new_ssid = self.selected_new_ssid();
+        let selected_eth = self.selected_eth_iface().map(|i| i.name.clone());
+
         if let Ok(wifi) = self.wifi_backend.query_state() {
-            let selected = self.wifi_state.selected();
             self.wifi = wifi;
-            if self.wifi.networks.is_empty() {
-                self.wifi_state.select(None);
-            } else if let Some(i) = selected {
-                self.wifi_state
-                    .select(Some(i.min(self.wifi.networks.len().saturating_sub(1))));
-            } else {
-                self.wifi_state.select(Some(0));
-            }
+            self.restore_wifi_selection(known_ssid, new_ssid);
+            self.wifi_iface_details = self
+                .wifi
+                .ifaces
+                .first()
+                .and_then(|iface| self.eth_backend.iface_details(iface).ok());
         }
 
         if let Ok(ifaces) = self.eth_backend.list_ifaces() {
-            let selected = self.ethernet_state.selected();
             self.ethernet = EthernetState { ifaces };
-            if self.ethernet.ifaces.is_empty() {
-                self.ethernet_state.select(None);
-            } else if let Some(i) = selected {
-                self.ethernet_state
-                    .select(Some(i.min(self.ethernet.ifaces.len().saturating_sub(1))));
-            } else {
-                self.ethernet_state.select(Some(0));
-            }
+            self.restore_ethernet_selection(selected_eth);
         }
 
+        self.ensure_valid_wifi_focus();
         self.last_error = None;
     }
 
@@ -144,75 +142,101 @@ impl App {
         self.running = false;
     }
 
-    pub fn switch_tab_next(&mut self) {
+    pub fn switch_transport_next(&mut self) {
         self.active_tab = match self.active_tab {
             ActiveTab::Wifi => ActiveTab::Ethernet,
             ActiveTab::Ethernet => ActiveTab::Wifi,
         };
     }
 
-    pub fn switch_tab_prev(&mut self) {
-        self.switch_tab_next();
+    pub fn switch_transport_prev(&mut self) {
+        self.switch_transport_next();
+    }
+
+    pub fn switch_focus_next(&mut self) {
+        if self.active_tab != ActiveTab::Wifi {
+            return;
+        }
+
+        for _ in 0..3 {
+            self.wifi_focus = match self.wifi_focus {
+                WifiFocus::KnownNetworks => WifiFocus::NewNetworks,
+                WifiFocus::NewNetworks => WifiFocus::Adapter,
+                WifiFocus::Adapter => WifiFocus::KnownNetworks,
+            };
+            if self.focus_has_items(self.wifi_focus) {
+                return;
+            }
+        }
+    }
+
+    pub fn switch_focus_prev(&mut self) {
+        if self.active_tab != ActiveTab::Wifi {
+            return;
+        }
+
+        for _ in 0..3 {
+            self.wifi_focus = match self.wifi_focus {
+                WifiFocus::KnownNetworks => WifiFocus::Adapter,
+                WifiFocus::NewNetworks => WifiFocus::KnownNetworks,
+                WifiFocus::Adapter => WifiFocus::NewNetworks,
+            };
+            if self.focus_has_items(self.wifi_focus) {
+                return;
+            }
+        }
     }
 
     pub fn select_next(&mut self) {
         match self.active_tab {
-            ActiveTab::Wifi => {
-                if self.wifi.networks.is_empty() {
-                    self.wifi_state.select(None);
-                    return;
+            ActiveTab::Wifi => match self.wifi_focus {
+                WifiFocus::KnownNetworks => {
+                    select_next_in_state(&mut self.wifi_known_state, self.wifi.known_networks.len())
                 }
-                let i = match self.wifi_state.selected() {
-                    Some(i) => (i + 1).min(self.wifi.networks.len() - 1),
-                    None => 0,
-                };
-                self.wifi_state.select(Some(i));
-            }
+                WifiFocus::NewNetworks => {
+                    select_next_in_state(&mut self.wifi_new_state, self.wifi.new_networks.len())
+                }
+                WifiFocus::Adapter => {
+                    select_next_in_state(&mut self.wifi_adapter_state, self.wifi.ifaces.len())
+                }
+            },
             ActiveTab::Ethernet => {
-                if self.ethernet.ifaces.is_empty() {
-                    self.ethernet_state.select(None);
-                    return;
-                }
-                let i = match self.ethernet_state.selected() {
-                    Some(i) => (i + 1).min(self.ethernet.ifaces.len() - 1),
-                    None => 0,
-                };
-                self.ethernet_state.select(Some(i));
+                select_next_in_state(&mut self.ethernet_state, self.ethernet.ifaces.len())
             }
         }
     }
 
     pub fn select_prev(&mut self) {
         match self.active_tab {
-            ActiveTab::Wifi => {
-                if self.wifi.networks.is_empty() {
-                    self.wifi_state.select(None);
-                    return;
+            ActiveTab::Wifi => match self.wifi_focus {
+                WifiFocus::KnownNetworks => {
+                    select_prev_in_state(&mut self.wifi_known_state, self.wifi.known_networks.len())
                 }
-                let i = match self.wifi_state.selected() {
-                    Some(i) => i.saturating_sub(1),
-                    None => 0,
-                };
-                self.wifi_state.select(Some(i));
-            }
+                WifiFocus::NewNetworks => {
+                    select_prev_in_state(&mut self.wifi_new_state, self.wifi.new_networks.len())
+                }
+                WifiFocus::Adapter => {
+                    select_prev_in_state(&mut self.wifi_adapter_state, self.wifi.ifaces.len())
+                }
+            },
             ActiveTab::Ethernet => {
-                if self.ethernet.ifaces.is_empty() {
-                    self.ethernet_state.select(None);
-                    return;
-                }
-                let i = match self.ethernet_state.selected() {
-                    Some(i) => i.saturating_sub(1),
-                    None => 0,
-                };
-                self.ethernet_state.select(Some(i));
+                select_prev_in_state(&mut self.ethernet_state, self.ethernet.ifaces.len())
             }
         }
     }
 
     pub fn selected_wifi_network(&self) -> Option<&WifiNetwork> {
-        self.wifi_state
-            .selected()
-            .and_then(|i| self.wifi.networks.get(i))
+        match self.wifi_focus {
+            WifiFocus::KnownNetworks => self
+                .wifi_known_state
+                .selected()
+                .and_then(|i| self.wifi.known_networks.get(i)),
+            WifiFocus::NewNetworks => self
+                .wifi_new_state
+                .selected()
+                .and_then(|i| self.wifi.new_networks.get(i)),
+            WifiFocus::Adapter => None,
+        }
     }
 
     pub fn selected_eth_iface(&self) -> Option<&EthernetIface> {
@@ -231,6 +255,14 @@ impl App {
 
     pub fn clear_error(&mut self) {
         self.last_error = None;
+    }
+
+    pub fn toggle_wifi_details(&mut self) {
+        if !self.wifi.has_adapter() {
+            self.set_toast(ToastKind::Error, "No Wi-Fi adapter found");
+            return;
+        }
+        self.show_wifi_details = !self.show_wifi_details;
     }
 
     pub async fn notify(&self, title: &str, body: &str) {
@@ -267,7 +299,9 @@ impl App {
             .ok_or_else(|| std::io::Error::other("no wifi adapter found"))?;
 
         let Some(net) = self.selected_wifi_network().cloned() else {
-            return Err(std::io::Error::other("no network selected").into());
+            return Err(
+                std::io::Error::other("select a network in Known or New Networks first").into(),
+            );
         };
 
         if net.connected {
@@ -325,6 +359,89 @@ impl App {
             .await;
         Ok(())
     }
+
+    fn init_wifi_states(&mut self) {
+        select_first_if_any(&mut self.wifi_known_state, self.wifi.known_networks.len());
+        select_first_if_any(&mut self.wifi_new_state, self.wifi.new_networks.len());
+        select_first_if_any(&mut self.wifi_adapter_state, self.wifi.ifaces.len());
+        self.ensure_valid_wifi_focus();
+    }
+
+    fn init_ethernet_state(&mut self) {
+        select_first_if_any(&mut self.ethernet_state, self.ethernet.ifaces.len());
+    }
+
+    fn selected_known_ssid(&self) -> Option<String> {
+        self.wifi_known_state
+            .selected()
+            .and_then(|i| self.wifi.known_networks.get(i))
+            .map(|n| n.ssid.clone())
+    }
+
+    fn selected_new_ssid(&self) -> Option<String> {
+        self.wifi_new_state
+            .selected()
+            .and_then(|i| self.wifi.new_networks.get(i))
+            .map(|n| n.ssid.clone())
+    }
+
+    fn restore_wifi_selection(&mut self, known_ssid: Option<String>, new_ssid: Option<String>) {
+        if let Some(ssid) = known_ssid {
+            if let Some(idx) = self.wifi.known_networks.iter().position(|n| n.ssid == ssid) {
+                self.wifi_known_state.select(Some(idx));
+            } else {
+                select_first_if_any(&mut self.wifi_known_state, self.wifi.known_networks.len());
+            }
+        } else {
+            select_first_if_any(&mut self.wifi_known_state, self.wifi.known_networks.len());
+        }
+
+        if let Some(ssid) = new_ssid {
+            if let Some(idx) = self.wifi.new_networks.iter().position(|n| n.ssid == ssid) {
+                self.wifi_new_state.select(Some(idx));
+            } else {
+                select_first_if_any(&mut self.wifi_new_state, self.wifi.new_networks.len());
+            }
+        } else {
+            select_first_if_any(&mut self.wifi_new_state, self.wifi.new_networks.len());
+        }
+
+        select_first_if_any(&mut self.wifi_adapter_state, self.wifi.ifaces.len());
+    }
+
+    fn restore_ethernet_selection(&mut self, selected_iface: Option<String>) {
+        if let Some(name) = selected_iface {
+            if let Some(idx) = self.ethernet.ifaces.iter().position(|i| i.name == name) {
+                self.ethernet_state.select(Some(idx));
+                return;
+            }
+        }
+        select_first_if_any(&mut self.ethernet_state, self.ethernet.ifaces.len());
+    }
+
+    fn ensure_valid_wifi_focus(&mut self) {
+        if self.focus_has_items(self.wifi_focus) {
+            return;
+        }
+        for candidate in [
+            WifiFocus::KnownNetworks,
+            WifiFocus::NewNetworks,
+            WifiFocus::Adapter,
+        ] {
+            if self.focus_has_items(candidate) {
+                self.wifi_focus = candidate;
+                return;
+            }
+        }
+    }
+
+    fn focus_has_items(&self, focus: WifiFocus) -> bool {
+        match focus {
+            WifiFocus::KnownNetworks => !self.wifi.known_networks.is_empty(),
+            WifiFocus::NewNetworks => !self.wifi.new_networks.is_empty(),
+            WifiFocus::Adapter => !self.wifi.ifaces.is_empty(),
+        }
+    }
 }
 
 pub fn determine_start_tab(
@@ -369,6 +486,38 @@ fn snapshot_eth(iface: Option<&EthernetIface>) -> String {
     )
 }
 
+fn select_first_if_any(state: &mut TableState, len: usize) {
+    if len == 0 {
+        state.select(None);
+    } else if state.selected().is_none() {
+        state.select(Some(0));
+    }
+}
+
+fn select_next_in_state(state: &mut TableState, len: usize) {
+    if len == 0 {
+        state.select(None);
+        return;
+    }
+    let i = match state.selected() {
+        Some(i) => (i + 1).min(len - 1),
+        None => 0,
+    };
+    state.select(Some(i));
+}
+
+fn select_prev_in_state(state: &mut TableState, len: usize) {
+    if len == 0 {
+        state.select(None);
+        return;
+    }
+    let i = match state.selected() {
+        Some(i) => i.saturating_sub(1),
+        None => 0,
+    };
+    state.select(Some(i));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -378,7 +527,8 @@ mod tests {
         let wifi = WifiState {
             ifaces: vec!["wlan0".to_string()],
             connected_ssid: Some("Home".to_string()),
-            networks: vec![],
+            known_networks: vec![],
+            new_networks: vec![],
         };
         let ethernet = EthernetState {
             ifaces: vec![EthernetIface {
@@ -405,7 +555,8 @@ mod tests {
         let wifi = WifiState {
             ifaces: vec!["wlan0".to_string()],
             connected_ssid: None,
-            networks: vec![],
+            known_networks: vec![],
+            new_networks: vec![],
         };
         let ethernet = EthernetState { ifaces: vec![] };
 

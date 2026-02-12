@@ -10,7 +10,8 @@ pub struct WifiNetwork {
 pub struct WifiState {
     pub ifaces: Vec<String>,
     pub connected_ssid: Option<String>,
-    pub networks: Vec<WifiNetwork>,
+    pub known_networks: Vec<WifiNetwork>,
+    pub new_networks: Vec<WifiNetwork>,
 }
 
 impl WifiState {
@@ -18,7 +19,8 @@ impl WifiState {
         Self {
             ifaces: Vec::new(),
             connected_ssid: None,
-            networks: Vec::new(),
+            known_networks: Vec::new(),
+            new_networks: Vec::new(),
         }
     }
 

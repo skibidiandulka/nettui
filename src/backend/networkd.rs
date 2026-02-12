@@ -73,6 +73,21 @@ impl NetworkdBackend {
 
         Err(std::io::Error::other("failed to run networkctl").into())
     }
+
+    pub fn iface_details(&self, iface: &str) -> Result<EthernetIface> {
+        let base = Path::new("/sys/class/net").join(iface);
+        if !base.exists() {
+            return Err(std::io::Error::other(format!("interface not found: {iface}")).into());
+        }
+        if iface == "lo" {
+            return Err(std::io::Error::other("loopback interface is not supported").into());
+        }
+        if !is_physical_iface(iface) {
+            return Err(std::io::Error::other(format!("not a physical interface: {iface}")).into());
+        }
+
+        build_iface(iface)
+    }
 }
 
 impl EthernetBackend for NetworkdBackend {
@@ -202,30 +217,33 @@ fn list_ethernet_ifaces() -> Result<Vec<EthernetIface>> {
             continue;
         }
 
-        let base = Path::new("/sys/class/net").join(&name);
-
-        let operstate = read_to_string(base.join("operstate")).unwrap_or_else(|| "?".into());
-        let carrier = read_bool(base.join("carrier"));
-        let mac = read_to_string(base.join("address"));
-        let speed_mbps = read_u32(base.join("speed"));
-
-        let (ipv4, ipv6) = list_ip_addrs_for_iface(&name).unwrap_or_default();
-        let gateway_v4 = parse_default_gateway_v4_for_iface(&name).map(|g| g.to_string());
-        let dns = list_dns_servers();
-
-        devices.push(EthernetIface {
-            name,
-            operstate,
-            carrier,
-            mac,
-            speed_mbps,
-            ipv4,
-            ipv6,
-            gateway_v4,
-            dns,
-        });
+        devices.push(build_iface(&name)?);
     }
 
     devices.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(devices)
+}
+
+fn build_iface(name: &str) -> Result<EthernetIface> {
+    let base = Path::new("/sys/class/net").join(name);
+    let operstate = read_to_string(base.join("operstate")).unwrap_or_else(|| "?".into());
+    let carrier = read_bool(base.join("carrier"));
+    let mac = read_to_string(base.join("address"));
+    let speed_mbps = read_u32(base.join("speed"));
+
+    let (ipv4, ipv6) = list_ip_addrs_for_iface(name).unwrap_or_default();
+    let gateway_v4 = parse_default_gateway_v4_for_iface(name).map(|g| g.to_string());
+    let dns = list_dns_servers();
+
+    Ok(EthernetIface {
+        name: name.to_string(),
+        operstate,
+        carrier,
+        mac,
+        speed_mbps,
+        ipv4,
+        ipv6,
+        gateway_v4,
+        dns,
+    })
 }

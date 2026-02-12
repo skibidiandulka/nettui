@@ -8,8 +8,10 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> Result<()>
         KeyCode::Esc if app.config.esc_quit => app.quit(),
         KeyCode::Char('c' | 'C') if key_event.modifiers == KeyModifiers::CONTROL => app.quit(),
 
-        KeyCode::Tab | KeyCode::Char('l') => app.switch_tab_next(),
-        KeyCode::BackTab | KeyCode::Char('h') => app.switch_tab_prev(),
+        KeyCode::Right | KeyCode::Char('l') => app.switch_transport_next(),
+        KeyCode::Left | KeyCode::Char('h') => app.switch_transport_prev(),
+        KeyCode::Tab => app.switch_focus_next(),
+        KeyCode::BackTab => app.switch_focus_prev(),
 
         KeyCode::Down | KeyCode::Char('j') => app.select_next(),
         KeyCode::Up | KeyCode::Char('k') => app.select_prev(),
@@ -35,6 +37,10 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> Result<()>
             } else {
                 app.refresh_current().await;
             }
+        }
+
+        KeyCode::Char('i') if app.active_tab == ActiveTab::Wifi => {
+            app.toggle_wifi_details();
         }
 
         KeyCode::Char('n') if app.active_tab == ActiveTab::Ethernet => {

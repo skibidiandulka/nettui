@@ -1,6 +1,6 @@
 use crate::{
     app::App,
-    domain::common::{ActiveTab, ToastKind},
+    domain::common::{ActiveTab, ToastKind, WifiFocus},
 };
 use ratatui::{
     Frame,
@@ -34,8 +34,11 @@ pub fn render_tabs(app: &App, frame: &mut Frame, area: Rect) {
 
 pub fn render_footer(app: &App, frame: &mut Frame, area: Rect) {
     let mut spans = vec![
-        Span::from("Tab").bold(),
-        Span::from(" switch"),
+        Span::from("h,←").bold(),
+        Span::from(" Prev tab"),
+        Span::from(" | "),
+        Span::from("l,→").bold(),
+        Span::from(" Next tab"),
         Span::from(" | "),
         Span::from("k,↑").bold(),
         Span::from(" Up"),
@@ -50,12 +53,26 @@ pub fn render_footer(app: &App, frame: &mut Frame, area: Rect) {
 
     match app.active_tab {
         ActiveTab::Wifi => {
+            let focus = match app.wifi_focus {
+                WifiFocus::KnownNetworks => "Known",
+                WifiFocus::NewNetworks => "New",
+                WifiFocus::Adapter => "Adapter",
+            };
             spans.extend([
+                Span::from("Tab").bold(),
+                Span::from(" section"),
+                Span::from(" | "),
+                Span::from("focus:").bold(),
+                Span::from(format!(" {focus}")),
+                Span::from(" | "),
                 Span::from("s").bold(),
                 Span::from(" scan"),
                 Span::from(" | "),
                 Span::from("Enter").bold(),
                 Span::from(" connect/disconnect"),
+                Span::from(" | "),
+                Span::from("i").bold(),
+                Span::from(" details"),
             ]);
         }
         ActiveTab::Ethernet => {
@@ -71,7 +88,7 @@ pub fn render_footer(app: &App, frame: &mut Frame, area: Rect) {
 
     let p = Paragraph::new(Line::from(spans))
         .alignment(Alignment::Center)
-        .style(Style::default().fg(Color::Cyan));
+        .style(Style::default().fg(Color::Blue));
     frame.render_widget(p, area);
 }
 
