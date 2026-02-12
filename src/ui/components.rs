@@ -1,6 +1,6 @@
 use crate::{
     app::App,
-    domain::common::{ActiveTab, ToastKind, WifiFocus},
+    domain::common::{ActiveTab, ToastKind},
 };
 use ratatui::{
     Frame,
@@ -53,23 +53,15 @@ pub fn render_footer(app: &App, frame: &mut Frame, area: Rect) {
 
     match app.active_tab {
         ActiveTab::Wifi => {
-            let focus = match app.wifi_focus {
-                WifiFocus::KnownNetworks => "Known",
-                WifiFocus::NewNetworks => "New",
-                WifiFocus::Adapter => "Adapter",
-            };
             spans.extend([
                 Span::from("Tab").bold(),
                 Span::from(" section"),
-                Span::from(" | "),
-                Span::from("focus:").bold(),
-                Span::from(format!(" {focus}")),
                 Span::from(" | "),
                 Span::from("s").bold(),
                 Span::from(" scan"),
                 Span::from(" | "),
                 Span::from("Enter").bold(),
-                Span::from(" connect/disconnect"),
+                Span::from(" dis/connect"),
                 Span::from(" | "),
                 Span::from("i").bold(),
                 Span::from(" details"),

@@ -1,4 +1,4 @@
-use crate::{app::App, domain::common::WifiFocus};
+use crate::{app::App, domain::common::WifiFocus, domain::wifi::WifiDeviceInfo};
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout, Rect},
@@ -11,7 +11,7 @@ pub fn render(app: &mut App, frame: &mut Frame, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Min(6),
+            Constraint::Min(7),
             Constraint::Min(6),
             Constraint::Length(5),
         ])
@@ -19,7 +19,7 @@ pub fn render(app: &mut App, frame: &mut Frame, area: Rect) {
 
     render_known_networks(app, frame, chunks[0]);
     render_new_networks(app, frame, chunks[1]);
-    render_adapter(app, frame, chunks[2]);
+    render_device(app, frame, chunks[2]);
 
     if app.show_wifi_details {
         render_details_popup(app, frame);
@@ -34,9 +34,19 @@ fn render_known_networks(app: &mut App, frame: &mut Frame, area: Rect) {
         .iter()
         .map(|n| {
             Row::new(vec![
-                Cell::from(if n.connected { "󰤨" } else { "" }),
+                Cell::from(if n.connected { "󰖩" } else { "" }),
                 Cell::from(n.ssid.clone()),
                 Cell::from(n.security.clone()),
+                Cell::from(
+                    n.hidden
+                        .map(|v| if v { "Yes" } else { "No" })
+                        .unwrap_or("-"),
+                ),
+                Cell::from(
+                    n.autoconnect
+                        .map(|v| if v { "Yes" } else { "No" })
+                        .unwrap_or("-"),
+                ),
             ])
         })
         .collect();
@@ -45,12 +55,14 @@ fn render_known_networks(app: &mut App, frame: &mut Frame, area: Rect) {
         rows,
         [
             Constraint::Length(2),
-            Constraint::Min(20),
+            Constraint::Length(30),
+            Constraint::Length(10),
+            Constraint::Length(8),
             Constraint::Length(14),
         ],
     )
     .header(
-        Row::new(vec!["", "SSID", "Security"])
+        Row::new(vec!["", "Name", "Security", "Hidden", "Auto Connect"])
             .style(Style::default().fg(Color::Yellow).bold())
             .bottom_margin(1),
     )
@@ -72,7 +84,6 @@ fn render_new_networks(app: &mut App, frame: &mut Frame, area: Rect) {
         .iter()
         .map(|n| {
             Row::new(vec![
-                Cell::from(if n.connected { "󰤨" } else { "" }),
                 Cell::from(n.ssid.clone()),
                 Cell::from(n.security.clone()),
                 Cell::from(n.signal.clone()),
@@ -83,14 +94,13 @@ fn render_new_networks(app: &mut App, frame: &mut Frame, area: Rect) {
     let table = Table::new(
         rows,
         [
-            Constraint::Length(2),
-            Constraint::Min(20),
-            Constraint::Length(14),
-            Constraint::Length(8),
+            Constraint::Length(30),
+            Constraint::Length(12),
+            Constraint::Length(10),
         ],
     )
     .header(
-        Row::new(vec!["", "SSID", "Security", "Signal"])
+        Row::new(vec!["Name", "Security", "Signal"])
             .style(Style::default().fg(Color::Yellow).bold())
             .bottom_margin(1),
     )
@@ -104,40 +114,66 @@ fn render_new_networks(app: &mut App, frame: &mut Frame, area: Rect) {
     frame.render_stateful_widget(table, area, &mut app.wifi_new_state);
 }
 
-fn render_adapter(app: &mut App, frame: &mut Frame, area: Rect) {
+fn render_device(app: &mut App, frame: &mut Frame, area: Rect) {
     let focused = app.wifi_focus == WifiFocus::Adapter;
-    let connected = app
-        .wifi
-        .connected_ssid
-        .clone()
-        .unwrap_or_else(|| "-".to_string());
+    let dev = app.wifi.device.clone().unwrap_or_else(|| WifiDeviceInfo {
+        iface: app
+            .wifi
+            .ifaces
+            .first()
+            .cloned()
+            .unwrap_or_else(|| "-".to_string()),
+        mode: "station".to_string(),
+        powered: "On".to_string(),
+        state: "-".to_string(),
+        scanning: "-".to_string(),
+        frequency: "-".to_string(),
+        security: "-".to_string(),
+    });
 
-    let rows: Vec<Row> = app
-        .wifi
-        .ifaces
-        .iter()
-        .map(|iface| {
-            Row::new(vec![
-                Cell::from(iface.clone()),
-                Cell::from(connected.clone()),
-            ])
-        })
-        .collect();
+    let rows = vec![Row::new(vec![
+        Cell::from(dev.iface),
+        Cell::from(dev.mode),
+        Cell::from(dev.powered),
+        Cell::from(dev.state),
+        Cell::from(dev.scanning),
+        Cell::from(dev.frequency),
+        Cell::from(dev.security),
+    ])];
 
-    let table = Table::new(rows, [Constraint::Length(16), Constraint::Min(20)])
-        .header(
-            Row::new(vec!["Interface", "Connected SSID"])
-                .style(Style::default().fg(Color::Yellow).bold())
-                .bottom_margin(1),
-        )
-        .block(section_block(" Adapter ", focused))
-        .row_highlight_style(if focused {
-            Style::default().bg(Color::DarkGray).fg(Color::White)
-        } else {
-            Style::default()
-        });
+    let table = Table::new(
+        rows,
+        [
+            Constraint::Length(12),
+            Constraint::Length(8),
+            Constraint::Length(8),
+            Constraint::Length(10),
+            Constraint::Length(10),
+            Constraint::Length(10),
+            Constraint::Length(12),
+        ],
+    )
+    .header(
+        Row::new(vec![
+            "Name",
+            "Mode",
+            "Powered",
+            "State",
+            "Scanning",
+            "Frequency",
+            "Security",
+        ])
+        .style(Style::default().fg(Color::Yellow).bold())
+        .bottom_margin(1),
+    )
+    .block(section_block(" Device ", focused))
+    .row_highlight_style(if focused {
+        Style::default().bg(Color::DarkGray).fg(Color::White)
+    } else {
+        Style::default()
+    });
 
-    frame.render_stateful_widget(table, area, &mut app.wifi_adapter_state);
+    frame.render_widget(table, area);
 }
 
 fn section_block(title: &str, focused: bool) -> Block<'_> {

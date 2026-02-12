@@ -9,7 +9,7 @@ use ratatui::{
 };
 
 pub fn render(app: &mut App, frame: &mut Frame) {
-    const MIN_W: u16 = 90;
+    const MIN_W: u16 = 118;
     const MIN_H: u16 = 26;
 
     let area = frame.area();

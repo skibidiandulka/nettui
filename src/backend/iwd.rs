@@ -1,6 +1,6 @@
 use crate::{
     backend::traits::WifiBackend,
-    domain::wifi::{WifiNetwork, WifiState},
+    domain::wifi::{WifiDeviceInfo, WifiNetwork, WifiState},
 };
 use anyhow::Result;
 use std::collections::HashSet;
@@ -38,6 +38,7 @@ impl WifiBackend for IwdBackend {
         let connected_ssid = parse_connected_network(&iface);
         let mut known_networks = parse_known_networks();
         let mut new_networks = parse_networks(&iface);
+        let station_info = parse_station_info(&iface);
 
         if let Some(conn) = &connected_ssid {
             for n in &mut known_networks {
@@ -56,11 +57,25 @@ impl WifiBackend for IwdBackend {
         let known_ssids: HashSet<&str> = known_networks.iter().map(|n| n.ssid.as_str()).collect();
         new_networks.retain(|n| !known_ssids.contains(n.ssid.as_str()));
 
+        let security = station_info.security.unwrap_or_else(|| {
+            infer_connected_security(&known_networks, &new_networks)
+                .unwrap_or_else(|| "-".to_string())
+        });
+
         Ok(WifiState {
             ifaces,
             connected_ssid,
             known_networks,
             new_networks,
+            device: Some(WifiDeviceInfo {
+                iface: iface.clone(),
+                mode: "station".to_string(),
+                powered: "On".to_string(),
+                state: station_info.state.unwrap_or_else(|| "-".to_string()),
+                scanning: station_info.scanning.unwrap_or_else(|| "-".to_string()),
+                frequency: station_info.frequency.unwrap_or_else(|| "-".to_string()),
+                security,
+            }),
         })
     }
 }
@@ -157,6 +172,8 @@ fn parse_networks(iface: &str) -> Vec<WifiNetwork> {
             security,
             signal,
             connected,
+            hidden: None,
+            autoconnect: None,
         });
     }
 
@@ -202,10 +219,73 @@ fn parse_known_networks() -> Vec<WifiNetwork> {
             security,
             signal: "-".to_string(),
             connected: false,
+            hidden: None,
+            autoconnect: None,
         });
     }
 
     nets
+}
+
+#[derive(Default)]
+struct StationInfo {
+    state: Option<String>,
+    scanning: Option<String>,
+    frequency: Option<String>,
+    security: Option<String>,
+}
+
+fn parse_station_info(iface: &str) -> StationInfo {
+    let out = std::process::Command::new("iwctl")
+        .arg("station")
+        .arg(iface)
+        .arg("show")
+        .output();
+
+    let Ok(out) = out else {
+        return StationInfo::default();
+    };
+    if !out.status.success() {
+        return StationInfo::default();
+    }
+
+    let txt = String::from_utf8_lossy(&out.stdout);
+    let mut info = StationInfo::default();
+
+    for raw in txt.lines() {
+        let line = raw.trim();
+        if let Some(v) = value_after_key(line, "State") {
+            info.state = Some(v.to_string());
+        } else if let Some(v) = value_after_key(line, "Scanning") {
+            info.scanning = Some(v.to_string());
+        } else if let Some(v) = value_after_key(line, "Frequency") {
+            info.frequency = Some(v.to_string());
+        } else if let Some(v) = value_after_key(line, "Security") {
+            info.security = Some(v.to_string());
+        }
+    }
+
+    info
+}
+
+fn value_after_key<'a>(line: &'a str, key: &str) -> Option<&'a str> {
+    if !line.starts_with(key) {
+        return None;
+    }
+    let mut rest = &line[key.len()..];
+    rest = rest.trim();
+    if let Some(stripped) = rest.strip_prefix(':') {
+        rest = stripped.trim();
+    }
+    if rest.is_empty() { None } else { Some(rest) }
+}
+
+fn infer_connected_security(known: &[WifiNetwork], new: &[WifiNetwork]) -> Option<String> {
+    known
+        .iter()
+        .find(|n| n.connected)
+        .map(|n| n.security.clone())
+        .or_else(|| new.iter().find(|n| n.connected).map(|n| n.security.clone()))
 }
 
 async fn run_iwctl(args: &[&str]) -> Result<()> {

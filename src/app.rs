@@ -283,6 +283,7 @@ impl App {
             .cloned()
             .ok_or_else(|| std::io::Error::other("no wifi adapter found"))?;
         self.wifi_backend.scan(&iface).await?;
+        tokio::time::sleep(Duration::from_millis(1200)).await;
         self.last_action = Some(format!("Wi-Fi scan requested on {iface}"));
         self.set_toast(ToastKind::Info, format!("Wi-Fi scan requested on {iface}"));
         self.notify("Wi-Fi", &format!("Scan requested on {iface}"))
@@ -529,6 +530,7 @@ mod tests {
             connected_ssid: Some("Home".to_string()),
             known_networks: vec![],
             new_networks: vec![],
+            device: None,
         };
         let ethernet = EthernetState {
             ifaces: vec![EthernetIface {
@@ -557,6 +559,7 @@ mod tests {
             connected_ssid: None,
             known_networks: vec![],
             new_networks: vec![],
+            device: None,
         };
         let ethernet = EthernetState { ifaces: vec![] };
 
