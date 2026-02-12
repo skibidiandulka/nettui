@@ -844,11 +844,11 @@ impl App {
     }
 
     fn restore_ethernet_selection(&mut self, selected_iface: Option<String>) {
-        if let Some(name) = selected_iface {
-            if let Some(idx) = self.ethernet.ifaces.iter().position(|i| i.name == name) {
-                self.ethernet_state.select(Some(idx));
-                return;
-            }
+        if let Some(name) = selected_iface
+            && let Some(idx) = self.ethernet.ifaces.iter().position(|i| i.name == name)
+        {
+            self.ethernet_state.select(Some(idx));
+            return;
         }
         select_first_if_any(&mut self.ethernet_state, self.ethernet.ifaces.len());
     }
@@ -889,9 +889,7 @@ pub fn determine_start_tab(
         StartupTabPolicy::PreferActive => {
             if ethernet.has_active() {
                 ActiveTab::Ethernet
-            } else if wifi.is_active() {
-                ActiveTab::Wifi
-            } else if wifi.has_adapter() {
+            } else if wifi.is_active() || wifi.has_adapter() {
                 ActiveTab::Wifi
             } else {
                 ActiveTab::Ethernet

@@ -25,7 +25,7 @@ This project was inspired by and builds upon ideas from Impala by pythops.
   - link up/down toggle on selected interface
   - toggle link admin state up/down (`ip link set`)
   - DHCP renew (`networkctl renew`)
-- Toast/error popups and terminal size guard
+- Toast/error popups and terminal size guard (`119x35` minimum)
 
 ## Runtime assumptions
 
@@ -111,11 +111,41 @@ cargo test
 
 ## Omarchy integration (optional)
 
-Recommended launch command for Omarchy-style app-id handling:
+Current Omarchy launcher behavior:
 
 ```bash
-omarchy-launch-or-focus-tui nettui
+omarchy-launch-wifi
 ```
 
-If Omarchy chooses to make `nettui` the default network TUI later, this command can become the single
-launcher entry for both Wi-Fi and Ethernet workflows.
+On recent Omarchy, this already prefers `nettui` when installed.
+
+To force `nettui` as default network TUI:
+
+1. Install `nettui`:
+
+```bash
+yay -S nettui-bin
+```
+
+2. Verify launcher script prefers `nettui`:
+
+```bash
+grep -n "nettui" ~/.local/share/omarchy/bin/omarchy-launch-wifi
+grep -n "nettui" ~/.local/share/omarchy/bin/omarchy-launch-ethernet
+```
+
+3. If needed, patch both launchers:
+
+```bash
+sed -i 's/omarchy-launch-or-focus-tui impala/omarchy-launch-or-focus-tui nettui/g' ~/.local/share/omarchy/bin/omarchy-launch-wifi
+sed -i 's/omarchy-launch-or-focus-tui ethtui/omarchy-launch-or-focus-tui nettui/g' ~/.local/share/omarchy/bin/omarchy-launch-ethernet
+```
+
+4. Set dedicated floating window size for `nettui` (Hyprland):
+
+```bash
+grep -q "match:class org.omarchy.nettui" ~/.config/hypr/apps/system.conf || echo "windowrule = size 1190 735, match:class org.omarchy.nettui" >> ~/.config/hypr/apps/system.conf
+hyprctl reload
+```
+
+5. Click network module in Waybar to verify `nettui` opens.

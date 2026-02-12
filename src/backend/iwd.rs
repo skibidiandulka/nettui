@@ -296,6 +296,12 @@ impl IwdBackend {
     }
 }
 
+impl Default for IwdBackend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug, Clone)]
 struct KnownMeta {
     security: String,

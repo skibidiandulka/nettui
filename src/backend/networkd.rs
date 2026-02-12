@@ -45,21 +45,21 @@ impl NetworkdBackend {
                     .output()
                     .await;
 
-                if let Ok(pkexec_out) = pkexec_out {
-                    if pkexec_out.status.success() {
-                        return Ok(CommandResult {
-                            program: "networkctl".to_string(),
-                            args: vec!["renew".to_string(), iface.to_string()],
-                            used_sudo: true,
-                            status: pkexec_out.status.code().unwrap_or(0),
-                            stdout: String::from_utf8_lossy(&pkexec_out.stdout)
-                                .trim()
-                                .to_string(),
-                            stderr: String::from_utf8_lossy(&pkexec_out.stderr)
-                                .trim()
-                                .to_string(),
-                        });
-                    }
+                if let Ok(pkexec_out) = pkexec_out
+                    && pkexec_out.status.success()
+                {
+                    return Ok(CommandResult {
+                        program: "networkctl".to_string(),
+                        args: vec!["renew".to_string(), iface.to_string()],
+                        used_sudo: true,
+                        status: pkexec_out.status.code().unwrap_or(0),
+                        stdout: String::from_utf8_lossy(&pkexec_out.stdout)
+                            .trim()
+                            .to_string(),
+                        stderr: String::from_utf8_lossy(&pkexec_out.stderr)
+                            .trim()
+                            .to_string(),
+                    });
                 }
 
                 let sudo_out = Command::new("sudo")
@@ -142,27 +142,27 @@ impl NetworkdBackend {
                     .output()
                     .await;
 
-                if let Ok(pkexec_out) = pkexec_out {
-                    if pkexec_out.status.success() {
-                        return Ok(CommandResult {
-                            program: "ip".to_string(),
-                            args: vec![
-                                "link".to_string(),
-                                "set".to_string(),
-                                "dev".to_string(),
-                                iface.to_string(),
-                                state_arg.to_string(),
-                            ],
-                            used_sudo: true,
-                            status: pkexec_out.status.code().unwrap_or(0),
-                            stdout: String::from_utf8_lossy(&pkexec_out.stdout)
-                                .trim()
-                                .to_string(),
-                            stderr: String::from_utf8_lossy(&pkexec_out.stderr)
-                                .trim()
-                                .to_string(),
-                        });
-                    }
+                if let Ok(pkexec_out) = pkexec_out
+                    && pkexec_out.status.success()
+                {
+                    return Ok(CommandResult {
+                        program: "ip".to_string(),
+                        args: vec![
+                            "link".to_string(),
+                            "set".to_string(),
+                            "dev".to_string(),
+                            iface.to_string(),
+                            state_arg.to_string(),
+                        ],
+                        used_sudo: true,
+                        status: pkexec_out.status.code().unwrap_or(0),
+                        stdout: String::from_utf8_lossy(&pkexec_out.stdout)
+                            .trim()
+                            .to_string(),
+                        stderr: String::from_utf8_lossy(&pkexec_out.stderr)
+                            .trim()
+                            .to_string(),
+                    });
                 }
 
                 let sudo_out = Command::new("sudo")
@@ -223,6 +223,12 @@ impl NetworkdBackend {
         }
 
         build_iface(iface)
+    }
+}
+
+impl Default for NetworkdBackend {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
