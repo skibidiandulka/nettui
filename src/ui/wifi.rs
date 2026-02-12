@@ -208,13 +208,13 @@ fn render_device(app: &mut App, frame: &mut Frame, area: Rect) {
     let table = Table::new(
         rows,
         [
-            Constraint::Length(12),
-            Constraint::Length(8),
-            Constraint::Length(8),
-            Constraint::Length(10),
-            Constraint::Length(10),
-            Constraint::Length(10),
-            Constraint::Length(12),
+            Constraint::Percentage(14),
+            Constraint::Percentage(11),
+            Constraint::Percentage(11),
+            Constraint::Percentage(14),
+            Constraint::Percentage(14),
+            Constraint::Percentage(16),
+            Constraint::Percentage(20),
         ],
     )
     .header(
@@ -230,6 +230,7 @@ fn render_device(app: &mut App, frame: &mut Frame, area: Rect) {
         .style(Style::default().fg(Color::Yellow).bold())
         .bottom_margin(1),
     )
+    .column_spacing(1)
     .block(section_block(" Device ", focused))
     .row_highlight_style(if focused {
         Style::default().bg(Color::DarkGray).fg(Color::White)
@@ -241,11 +242,7 @@ fn render_device(app: &mut App, frame: &mut Frame, area: Rect) {
 }
 
 fn section_block(title: &str, focused: bool) -> Block<'_> {
-    let border = if focused {
-        Color::Green
-    } else {
-        Color::DarkGray
-    };
+    let border = if focused { Color::Green } else { Color::White };
     Block::default()
         .title(title)
         .borders(Borders::ALL)
@@ -301,24 +298,49 @@ fn render_wifi_passphrase_popup(app: &App, frame: &mut Frame) {
     frame.render_widget(block, area);
 
     let masked = "*".repeat(app.wifi_passphrase_input.chars().count());
-    let content = vec![
-        Line::from(vec![
-            Span::from("SSID: ").bold(),
-            Span::from(ssid).fg(Color::Cyan),
-        ]),
-        Line::from(""),
-        Line::from(vec![Span::from("Passphrase: ").bold(), Span::from(masked)]),
-        Line::from(""),
-        Line::from(vec![
-            Span::from("Enter").bold(),
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(3),
+            Constraint::Length(1),
+            Constraint::Length(1),
+        ])
+        .split(inner);
+
+    let content = vec![Line::from(vec![
+        Span::from("SSID: ").bold(),
+        Span::from(ssid).fg(Color::Cyan),
+    ])];
+    frame.render_widget(Paragraph::new(content), chunks[0]);
+
+    frame.render_widget(
+        Paragraph::new(Line::from("Passphrase:").style(Style::default().bold())),
+        chunks[1],
+    );
+
+    let field_block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Cyan))
+        .border_type(BorderType::Rounded);
+    let field_inner = field_block.inner(chunks[2]);
+    frame.render_widget(field_block, chunks[2]);
+    frame.render_widget(
+        Paragraph::new(Line::from(Span::from(masked).underlined())),
+        field_inner,
+    );
+
+    frame.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::from("↵").bold(),
             Span::from(" connect"),
             Span::from(" | "),
             Span::from("Esc").bold(),
             Span::from(" cancel"),
-        ]),
-    ];
-
-    frame.render_widget(Paragraph::new(content), inner);
+        ])),
+        chunks[4],
+    );
 }
 
 fn render_details_popup(app: &App, frame: &mut Frame) {

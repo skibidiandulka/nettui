@@ -33,26 +33,40 @@ pub fn render_tabs(app: &App, frame: &mut Frame, area: Rect) {
 }
 
 pub fn render_footer(app: &App, frame: &mut Frame, area: Rect) {
+    let prev_tab = app.keybinds.prev_tab.to_string();
+    let next_tab = app.keybinds.next_tab.to_string();
+    let up = app.keybinds.up.to_string();
+    let down = app.keybinds.down.to_string();
+    let refresh = app.keybinds.refresh.to_string();
+    let quit = app.keybinds.quit.to_string();
+    let wifi_scan = app.keybinds.wifi_scan.to_string();
+    let wifi_show_all = app.keybinds.wifi_show_all.to_string();
+    let wifi_forget = app.keybinds.wifi_forget.to_string();
+    let wifi_autoconnect = app.keybinds.wifi_autoconnect.to_string();
+    let wifi_hidden = app.keybinds.wifi_hidden.to_string();
+    let wifi_details = app.keybinds.wifi_details.to_string();
+    let ethernet_renew = app.keybinds.ethernet_renew.to_string();
+
     let mut line1 = vec![
-        Span::from("h,←").bold(),
+        Span::from(format!("{prev_tab},←")).bold(),
         Span::from(" Prev tab"),
         Span::from(" | "),
-        Span::from("l,→").bold(),
+        Span::from(format!("{next_tab},→")).bold(),
         Span::from(" Next tab"),
         Span::from(" | "),
-        Span::from("k,↑").bold(),
+        Span::from(format!("{up},↑")).bold(),
         Span::from(" Up"),
         Span::from(" | "),
-        Span::from("j,↓").bold(),
+        Span::from(format!("{down},↓")).bold(),
         Span::from(" Down"),
         Span::from(" | "),
-        Span::from("r").bold(),
+        Span::from(refresh).bold(),
         Span::from(" refresh"),
     ];
     if app.active_tab == ActiveTab::Wifi {
         line1.extend([
             Span::from(" | "),
-            Span::from("Tab").bold(),
+            Span::from("⇥").bold(),
             Span::from(" section"),
         ]);
     }
@@ -61,48 +75,48 @@ pub fn render_footer(app: &App, frame: &mut Frame, area: Rect) {
     match app.active_tab {
         ActiveTab::Wifi => match app.wifi_focus {
             WifiFocus::KnownNetworks => line2.extend([
-                Span::from("Enter").bold(),
+                Span::from("↵").bold(),
                 Span::from(" dis/connect"),
                 Span::from(" | "),
-                Span::from("a").bold(),
+                Span::from(wifi_show_all.clone()).bold(),
                 Span::from(" show all"),
                 Span::from(" | "),
-                Span::from("d").bold(),
+                Span::from(wifi_forget).bold(),
                 Span::from(" forget"),
                 Span::from(" | "),
-                Span::from("t").bold(),
+                Span::from(wifi_autoconnect).bold(),
                 Span::from(" autoconnect"),
                 Span::from(" | "),
-                Span::from("s").bold(),
+                Span::from(wifi_scan.clone()).bold(),
                 Span::from(" scan"),
             ]),
             WifiFocus::NewNetworks => line2.extend([
-                Span::from("Enter").bold(),
+                Span::from("↵").bold(),
                 Span::from(" connect"),
                 Span::from(" | "),
-                Span::from("a").bold(),
+                Span::from(wifi_show_all).bold(),
                 Span::from(" show all"),
                 Span::from(" | "),
-                Span::from("n").bold(),
+                Span::from(wifi_hidden).bold(),
                 Span::from(" hidden"),
                 Span::from(" | "),
-                Span::from("s").bold(),
+                Span::from(wifi_scan).bold(),
                 Span::from(" scan"),
             ]),
             WifiFocus::Adapter => line2.extend([
-                Span::from("s").bold(),
+                Span::from(wifi_scan).bold(),
                 Span::from(" scan"),
                 Span::from(" | "),
-                Span::from("i").bold(),
+                Span::from(wifi_details).bold(),
                 Span::from(" details"),
             ]),
         },
         ActiveTab::Ethernet => {
             line2.extend([
-                Span::from("Enter").bold(),
+                Span::from("↵").bold(),
                 Span::from(" link up/down"),
                 Span::from(" | "),
-                Span::from("n").bold(),
+                Span::from(ethernet_renew).bold(),
                 Span::from(" renew DHCP"),
             ]);
         }
@@ -110,7 +124,7 @@ pub fn render_footer(app: &App, frame: &mut Frame, area: Rect) {
 
     line2.extend([
         Span::from(" | "),
-        Span::from("q").bold(),
+        Span::from(quit).bold(),
         Span::from(" quit"),
     ]);
 
@@ -148,7 +162,10 @@ pub fn render_toast_popup(frame: &mut Frame, kind: ToastKind, msg: &str) {
         ToastKind::Info => (" Info ", Color::Cyan),
     };
 
-    let area = centered_rect(80, 28, frame.area());
+    let lines = msg.lines().count().max(1) as u16;
+    let width = frame.area().width.saturating_sub(2).clamp(24, 58);
+    let height = (lines + 2).clamp(4, 8);
+    let area = top_right_rect(width, height, frame.area());
     frame.render_widget(Clear, area);
 
     let block = Block::default()
@@ -207,4 +224,16 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
             Constraint::Percentage((100 - percent_x) / 2),
         ])
         .split(popup_layout[1])[1]
+}
+
+fn top_right_rect(width: u16, height: u16, area: Rect) -> Rect {
+    let margin_x: u16 = 1;
+    let margin_y: u16 = 1;
+    let width = width.min(area.width.saturating_sub(margin_x.saturating_mul(2)));
+    let height = height.min(area.height.saturating_sub(margin_y.saturating_mul(2)));
+    let x = area
+        .x
+        .saturating_add(area.width.saturating_sub(width + margin_x));
+    let y = area.y.saturating_add(margin_y);
+    Rect::new(x, y, width, height)
 }

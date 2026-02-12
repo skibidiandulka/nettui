@@ -1,6 +1,6 @@
 [package]
 name = "nettui"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2024"
 description = "Unified TUI for Wi-Fi and Ethernet"
 license = "GPL-3.0-only"
@@ -13,4 +13,6 @@ futures = "0.3"
 if-addrs = "0.13"
 iwdrs = "0.2.6"
 ratatui = "0.29"
+serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1.43", features = ["macros", "rt-multi-thread", "time", "sync", "process"] }
+toml = "0.8"

@@ -5,6 +5,7 @@ use crate::{
         ethernet::{EthernetIface, EthernetState},
         wifi::{WifiNetwork, WifiState},
     },
+    keybinds::Keybinds,
 };
 use anyhow::Result;
 use ratatui::widgets::TableState;
@@ -34,6 +35,7 @@ pub struct App {
     pub config: AppConfig,
     pub active_tab: ActiveTab,
     pub wifi_focus: WifiFocus,
+    pub keybinds: Keybinds,
 
     pub wifi: WifiState,
     pub wifi_known_state: TableState,
@@ -95,6 +97,7 @@ impl App {
             config,
             active_tab,
             wifi_focus: WifiFocus::KnownNetworks,
+            keybinds: Keybinds::load(),
             wifi,
             wifi_known_state: TableState::default(),
             wifi_new_state: TableState::default(),
@@ -548,7 +551,7 @@ impl App {
 
         let mut msg = format!("{iface}: DHCP renew requested");
         if out.used_sudo {
-            msg.push_str(" (sudo)");
+            msg.push_str(" (elevated)");
         }
         if !out.stdout.is_empty() {
             msg.push_str(&format!("\nstdout: {}", out.stdout));
@@ -584,7 +587,7 @@ impl App {
 
         let mut msg = format!("{}: link set {}", iface.name, state_word);
         if out.used_sudo {
-            msg.push_str(" (sudo)");
+            msg.push_str(" (elevated)");
         }
         if !out.stderr.is_empty() {
             msg.push_str(&format!("\nstderr: {}", out.stderr));

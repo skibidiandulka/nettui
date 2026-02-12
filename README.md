@@ -21,6 +21,7 @@ but with one app shell and switchable Wi-Fi/Ethernet panels.
   - detail popup for active Wi-Fi interface (`i`)
 - Ethernet (systemd-networkd):
   - list interfaces and details
+  - link up/down toggle on selected interface
   - toggle link admin state up/down (`ip link set`)
   - DHCP renew (`networkctl renew`)
 - Toast/error popups and terminal size guard
@@ -70,6 +71,27 @@ Ethernet tab:
 
 - `Enter`: toggle selected interface link (`up/down`)
 - `n`: renew DHCP on selected interface
+
+## Keybind configuration
+
+`nettui` reads optional key overrides from:
+
+`~/.config/nettui/keybinds.toml`
+
+Use the example template:
+
+```bash
+mkdir -p ~/.config/nettui
+cp /usr/share/doc/nettui/keybinds.toml.example ~/.config/nettui/keybinds.toml
+```
+
+or from repository:
+
+```bash
+cp config/keybinds.toml.example ~/.config/nettui/keybinds.toml
+```
+
+After changing keybinds, restart `nettui`.
 
 ## Build
 
