@@ -64,7 +64,6 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> Result<()>
         {
             app.clear_error();
             app.wifi_scan().await?;
-            app.refresh_current().await;
         }
 
         KeyCode::Char(c)
