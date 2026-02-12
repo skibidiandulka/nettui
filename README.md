@@ -8,27 +8,6 @@ It is built as a clean-room project inspired by the UX direction of tools like `
 but with one app shell and switchable Wi-Fi/Ethernet panels. It was built mainly for OMARCHY arch linux.
 This project was inspired by and builds upon ideas from Impala by pythops.
 
-## Scope (v0.1)
-
-- One TUI with two transport tabs: `Wi-Fi` and `Ethernet`
-- Startup tab policy: prefer active transport (`Ethernet` if active, else `Wi-Fi` if active)
-- Wi-Fi (iwd via D-Bus / `iwdrs`):
-  - split sections: `Known Networks`, `New Networks`, `Device`
-  - non-blocking scan/connect with spinner in section titles
-  - connect/disconnect selected network
-  - fallback passphrase prompt when iwd reports `No Agent registered`
-  - forget known network
-  - toggle autoconnect
-  - show/hide unavailable known and hidden network entries
-  - connect hidden network by SSID prompt
-  - detail popup for active Wi-Fi interface (`i`)
-- Ethernet (systemd-networkd):
-  - list interfaces and details
-  - link up/down toggle on selected interface
-  - toggle link admin state up/down (`ip link set`)
-  - DHCP renew (`networkctl renew`)
-- Toast/error popups and terminal size guard (`119x35` minimum)
-
 ## Runtime assumptions
 
 - Linux
