@@ -1,6 +1,5 @@
 use anyhow::Result;
 use crossterm::event::{Event as CrosstermEvent, KeyEvent};
-use futures::{FutureExt, StreamExt};
 use std::time::Duration;
 use tokio::sync::mpsc;
 
@@ -25,33 +24,39 @@ impl EventHandler {
         let sender_cloned = sender.clone();
 
         let handler = tokio::spawn(async move {
-            let mut reader = crossterm::event::EventStream::new();
-            let mut tick = tokio::time::interval(tick_rate);
+            let mut next_tick = std::time::Instant::now() + tick_rate;
 
             loop {
-                let tick_delay = tick.tick();
-                let crossterm_event = reader.next().fuse();
+                if sender_cloned.is_closed() {
+                    break;
+                }
 
-                tokio::select! {
-                    () = sender_cloned.closed() => {
-                        break;
-                    }
-                    _ = tick_delay => {
-                        let _ = sender_cloned.send(Event::Tick);
-                    }
-                    Some(Ok(evt)) = crossterm_event => {
-                        match evt {
-                            CrosstermEvent::Key(key) => {
-                                if key.kind == crossterm::event::KeyEventKind::Press {
-                                    let _ = sender_cloned.send(Event::Key(key));
+                // Poll terminal events in short slices to keep UI responsive and avoid
+                // EventStream backend panics on some environments.
+                match crossterm::event::poll(Duration::from_millis(25)) {
+                    Ok(true) => {
+                        if let Ok(evt) = crossterm::event::read() {
+                            match evt {
+                                CrosstermEvent::Key(key) => {
+                                    if key.kind == crossterm::event::KeyEventKind::Press {
+                                        let _ = sender_cloned.send(Event::Key(key));
+                                    }
                                 }
+                                CrosstermEvent::Resize(x, y) => {
+                                    let _ = sender_cloned.send(Event::Resize(x, y));
+                                }
+                                _ => {}
                             }
-                            CrosstermEvent::Resize(x, y) => {
-                                let _ = sender_cloned.send(Event::Resize(x, y));
-                            }
-                            _ => {}
                         }
                     }
+                    Ok(false) => {}
+                    Err(_) => {}
+                }
+
+                let now = std::time::Instant::now();
+                if now >= next_tick {
+                    let _ = sender_cloned.send(Event::Tick);
+                    next_tick = now + tick_rate;
                 }
             }
         });

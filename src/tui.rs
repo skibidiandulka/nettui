@@ -1,4 +1,4 @@
-use crate::{app::App, event::EventHandler, ui};
+use crate::{app::App, ui};
 use anyhow::Result;
 use crossterm::{
     execute,
@@ -9,12 +9,11 @@ use std::io;
 
 pub struct Tui<B: Backend> {
     pub terminal: Terminal<B>,
-    pub events: EventHandler,
 }
 
 impl<B: Backend> Tui<B> {
-    pub fn new(terminal: Terminal<B>, events: EventHandler) -> Self {
-        Self { terminal, events }
+    pub fn new(terminal: Terminal<B>) -> Self {
+        Self { terminal }
     }
 
     pub fn init(&mut self) -> Result<()> {
