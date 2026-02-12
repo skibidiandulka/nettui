@@ -92,13 +92,29 @@ mkdir -p ~/.config/nettui
 cp /usr/share/doc/nettui/keybinds.toml.example ~/.config/nettui/keybinds.toml
 ```
 
-or from repository:
+Edit your keybinds directly in:
 
 ```bash
-cp config/keybinds.toml.example ~/.config/nettui/keybinds.toml
+~/.config/nettui/keybinds.toml
 ```
 
 After changing keybinds, restart `nettui`.
+
+## Restart / control
+
+`nettui` is not a systemd service, so `systemctl` is not used.
+
+Quick restart:
+
+```bash
+pkill -x nettui || true
+omarchy-launch-or-focus-tui nettui
+```
+
+From inside the app:
+
+- press `q` to quit
+- launch again from Waybar network icon (or run `omarchy-launch-wifi`)
 
 ## Build
 
