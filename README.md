@@ -141,8 +141,6 @@ Current Omarchy launcher behavior:
 omarchy-launch-wifi
 ```
 
-On recent Omarchy, this already prefers `nettui` when installed.
-
 To force `nettui` as default network TUI:
 
 1. Install `nettui`:
