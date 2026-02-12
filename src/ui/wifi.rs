@@ -38,7 +38,7 @@ pub fn render(app: &mut App, frame: &mut Frame, area: Rect) {
 fn render_known_networks(app: &mut App, frame: &mut Frame, area: Rect) {
     let focused = app.wifi_focus == WifiFocus::KnownNetworks;
     let title = if app.wifi_connect_active() {
-        format!(" Known Networks (Connecting {}) ", app.spinner_glyph())
+        " Known Networks (Connecting) ".to_string()
     } else {
         " Known Networks ".to_string()
     };
@@ -126,9 +126,9 @@ fn render_known_networks(app: &mut App, frame: &mut Frame, area: Rect) {
 fn render_new_networks(app: &mut App, frame: &mut Frame, area: Rect) {
     let focused = app.wifi_focus == WifiFocus::NewNetworks;
     let title = if app.wifi_scanning_active() {
-        format!(" New Networks (Scanning {}) ", app.spinner_glyph())
+        " New Networks (Scanning) ".to_string()
     } else if app.wifi_connect_active() {
-        format!(" New Networks (Connecting {}) ", app.spinner_glyph())
+        " New Networks (Connecting) ".to_string()
     } else {
         " New Networks ".to_string()
     };
@@ -337,15 +337,12 @@ fn render_wifi_passphrase_popup(app: &App, frame: &mut Frame) {
     );
 
     let field_block = Block::default()
-        .borders(Borders::BOTTOM)
+        .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Cyan))
-        .border_type(BorderType::Plain);
+        .border_type(BorderType::Rounded);
     let field_inner = field_block.inner(chunks[2]);
     frame.render_widget(field_block, chunks[2]);
-    frame.render_widget(
-        Paragraph::new(Line::from(Span::from(masked).underlined())),
-        field_inner,
-    );
+    frame.render_widget(Paragraph::new(Line::from(Span::from(masked))), field_inner);
 
     frame.render_widget(
         Paragraph::new(Line::from(vec![

@@ -69,7 +69,6 @@ pub struct App {
     pub toast: Option<Toast>,
     pub wifi_scan_pending: bool,
     pub wifi_connect_pending: bool,
-    pub spinner_frame: usize,
     last_data_refresh_at: Instant,
     refresh_requested: bool,
     wifi_scan_started_at: Option<Instant>,
@@ -134,7 +133,6 @@ impl App {
             toast: None,
             wifi_scan_pending: false,
             wifi_connect_pending: false,
-            spinner_frame: 0,
             last_data_refresh_at: now,
             refresh_requested: false,
             wifi_scan_started_at: None,
@@ -159,7 +157,6 @@ impl App {
     pub async fn tick(&mut self) -> Result<()> {
         self.poll_background_tasks().await;
         let now = Instant::now();
-        self.spinner_frame = (self.spinner_frame + 1) % spinner_frames().len();
 
         if let Some(t) = &self.toast
             && now >= t.until
@@ -694,10 +691,6 @@ impl App {
         self.wifi_connect_pending
     }
 
-    pub fn spinner_glyph(&self) -> &'static str {
-        spinner_frames()[self.spinner_frame % spinner_frames().len()]
-    }
-
     async fn poll_background_tasks(&mut self) {
         let now = Instant::now();
         if self.wifi_scan_pending
@@ -1062,10 +1055,6 @@ fn is_no_agent_error(err: &anyhow::Error) -> bool {
     err.to_string()
         .to_lowercase()
         .contains("no agent registered")
-}
-
-fn spinner_frames() -> &'static [&'static str] {
-    &["-", "\\", "|", "/"]
 }
 
 fn snapshot_eth(iface: Option<&EthernetIface>) -> String {
