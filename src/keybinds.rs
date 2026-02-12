@@ -1,3 +1,6 @@
+// Copyright (C) 2026 skibidiandulka
+// Clean-room implementation inspired by Impala UX by pythops.
+
 use serde::Deserialize;
 use std::{env, fs, path::PathBuf};
 
@@ -44,6 +47,8 @@ impl Keybinds {
         let Some(path) = keybinds_path() else {
             return out;
         };
+
+        ensure_default_config_exists(&path);
 
         let Ok(raw) = fs::read_to_string(path) else {
             return out;
@@ -98,6 +103,24 @@ struct KeybindsPartial {
 fn keybinds_path() -> Option<PathBuf> {
     let home = env::var_os("HOME")?;
     Some(PathBuf::from(home).join(".config/nettui/keybinds.toml"))
+}
+
+fn ensure_default_config_exists(path: &PathBuf) {
+    if path.exists() {
+        return;
+    }
+    let Some(parent) = path.parent() else {
+        return;
+    };
+    if fs::create_dir_all(parent).is_err() {
+        return;
+    }
+
+    let _ = fs::write(path, default_config_template());
+}
+
+fn default_config_template() -> &'static str {
+    include_str!("../config/keybinds.toml.example")
 }
 
 fn apply_override(target: &mut char, value: Option<String>) {

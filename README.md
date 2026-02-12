@@ -4,6 +4,7 @@
 
 It is built as a clean-room project inspired by the UX direction of tools like `impala` and `ethtui`,
 but with one app shell and switchable Wi-Fi/Ethernet panels.
+This project was inspired by and builds upon ideas from Impala by pythops.
 
 ## Scope (v0.1)
 
@@ -78,7 +79,9 @@ Ethernet tab:
 
 `~/.config/nettui/keybinds.toml`
 
-Use the example template:
+On first launch, `nettui` automatically creates this file with defaults if it does not exist.
+
+You can still reset it manually from template:
 
 ```bash
 mkdir -p ~/.config/nettui
@@ -99,6 +102,10 @@ After changing keybinds, restart `nettui`.
 cargo build
 cargo test
 ```
+
+## License
+
+`nettui` is licensed under `GPL-3.0-only`. See `LICENSE`.
 
 ## Omarchy integration (optional)
 

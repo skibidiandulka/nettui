@@ -1,3 +1,6 @@
+// Copyright (C) 2026 skibidiandulka
+// Clean-room implementation inspired by Impala UX by pythops.
+
 use crate::{
     backend::{iwd::IwdBackend, networkd::NetworkdBackend, traits::EthernetBackend},
     domain::{

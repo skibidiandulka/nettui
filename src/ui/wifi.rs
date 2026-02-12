@@ -1,3 +1,6 @@
+// Copyright (C) 2026 skibidiandulka
+// Clean-room implementation inspired by Impala UX by pythops.
+
 use crate::{app::App, domain::common::WifiFocus, domain::wifi::WifiDeviceInfo};
 use ratatui::{
     Frame,
@@ -321,9 +324,9 @@ fn render_wifi_passphrase_popup(app: &App, frame: &mut Frame) {
     );
 
     let field_block = Block::default()
-        .borders(Borders::ALL)
+        .borders(Borders::BOTTOM)
         .border_style(Style::default().fg(Color::Cyan))
-        .border_type(BorderType::Rounded);
+        .border_type(BorderType::Plain);
     let field_inner = field_block.inner(chunks[2]);
     frame.render_widget(field_block, chunks[2]);
     frame.render_widget(
