@@ -49,6 +49,12 @@ or prebuilt binary package:
 yay -S nettui-bin
 ```
 
+From crates.io:
+
+```bash
+cargo install nettui
+```
+
 ## Controls
 
 Global:
