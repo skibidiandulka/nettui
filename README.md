@@ -67,6 +67,8 @@ Wi-Fi tab:
 - `t`: toggle autoconnect for selected known network
 - `n`: connect hidden network (from `New` section)
 - `i`: toggle Wi-Fi details popup
+- `New Networks` shows `- no new networks -` when no entries are discovered
+- `refresh` and `show all` actions display info toast feedback
 
 Ethernet tab:
 

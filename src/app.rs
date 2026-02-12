@@ -172,6 +172,15 @@ impl App {
 
     pub async fn refresh_current(&mut self) {
         self.refresh_all().await;
+        self.set_toast(
+            ToastKind::Info,
+            format!(
+                "Refreshed (Known: {}, New: {}, Ethernet: {})",
+                self.known_total_len(),
+                self.new_total_len(),
+                self.ethernet.ifaces.len()
+            ),
+        );
     }
 
     pub fn quit(&mut self) {
@@ -305,12 +314,33 @@ impl App {
         self.show_unavailable_known_networks = !self.show_unavailable_known_networks;
         let len = self.known_total_len();
         clamp_selected(&mut self.wifi_known_state, len);
+        let state = if self.show_unavailable_known_networks {
+            "enabled"
+        } else {
+            "disabled"
+        };
+        self.set_toast(
+            ToastKind::Info,
+            format!(
+                "Known: show all {state} ({} entries)",
+                self.known_total_len()
+            ),
+        );
     }
 
     pub fn toggle_new_show_all(&mut self) {
         self.show_hidden_networks = !self.show_hidden_networks;
         let len = self.new_total_len();
         clamp_selected(&mut self.wifi_new_state, len);
+        let state = if self.show_hidden_networks {
+            "enabled"
+        } else {
+            "disabled"
+        };
+        self.set_toast(
+            ToastKind::Info,
+            format!("New: show all {state} ({} entries)", self.new_total_len()),
+        );
     }
 
     pub fn open_hidden_connect_prompt(&mut self) {

@@ -158,6 +158,14 @@ fn render_new_networks(app: &mut App, frame: &mut Frame, area: Rect) {
         }
     }
 
+    if rows.is_empty() {
+        rows.push(Row::new(vec![
+            Cell::from("- no new networks -").dark_gray(),
+            Cell::from(""),
+            Cell::from(""),
+        ]));
+    }
+
     let table = Table::new(
         rows,
         [
@@ -246,10 +254,15 @@ fn render_device(app: &mut App, frame: &mut Frame, area: Rect) {
 
 fn section_block(title: &str, focused: bool) -> Block<'_> {
     let border = if focused { Color::Green } else { Color::White };
+    let border_type = if focused {
+        BorderType::Thick
+    } else {
+        BorderType::Plain
+    };
     Block::default()
         .title(title)
         .borders(Borders::ALL)
-        .border_type(BorderType::Thick)
+        .border_type(border_type)
         .border_style(Style::default().fg(border))
 }
 
