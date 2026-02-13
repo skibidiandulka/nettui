@@ -12,11 +12,7 @@ This project was inspired by and builds upon ideas from Impala by pythops.
 ## ✨ Features
 
 - One TUI with two transport tabs: `Wi-Fi` and `Ethernet`
-- Startup tab policy: prefer active transport (`Ethernet` if active, else `Wi-Fi` if active)
-- Wi-Fi workflow with split sections: `Known Networks`, `New Networks`, `Device`
-- Non-blocking scan/connect with spinner feedback
-- Debounced scan input (prevents accidental rapid scan spam)
-- Scan/connect timeout guards to avoid stuck pending states
+- Startup tab policy: prefer active transport (`Ethernet` if active, else `Wi-Fi` if active
 - Connect/disconnect, forget, autoconnect toggle, hidden SSID connect
 - Passphrase fallback flow when iwd reports `No Agent registered`
 - Ethernet details + link up/down + DHCP renew
