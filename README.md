@@ -55,23 +55,12 @@ yay -S nettui-bin
 nettui
 ```
 
-## ⚙️ Runtime behavior
-
-- UI tick drives animation and key handling.
-- Data refresh is rate-limited (not full refresh on every tick), which keeps spinner/input responsive.
-- Wi-Fi scan is debounced for rapid repeated key presses.
-- Wi-Fi scan/connect jobs are timeout-guarded to avoid frozen pending states.
-- Startup warns when overlapping Wi-Fi managers are active with `iwd`.
-
 ## 🩺 Troubleshooting
 
 - `scan` says `Wi-Fi scan already running`:
   - previous scan is still in progress.
 - `scan` says `Wait ... ms before next scan`:
   - debounce cooldown is active; retry after the short wait.
-- spinner appears frozen:
-  - check terminal size is at least `119x35`,
-  - verify `iwd` is healthy and not conflicting with another Wi-Fi manager.
 
 ## ⌨️ Controls
 
