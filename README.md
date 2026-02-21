@@ -127,7 +127,7 @@ rfkill unblock wifi
 omarchy-launch-or-focus-tui impala
 ```
 
-So installing `ethtui` alone does not replace Wi-Fi handling automatically.
+So installing `nettui` alone does not replace Wi-Fi handling automatically.
 
 To use `nettui` instead of `impala` in your local Omarchy install:
 
