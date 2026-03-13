@@ -128,7 +128,6 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> Result<()>
             app.clear_error();
             if let Err(e) = app.ethernet_renew_dhcp().await {
                 let msg = e.to_string();
-                app.set_ethernet_banner(ToastKind::Error, msg.clone());
                 app.set_toast(ToastKind::Error, msg);
             }
         }
@@ -137,7 +136,6 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> Result<()>
             app.clear_error();
             if let Err(e) = app.ethernet_toggle_link().await {
                 let msg = e.to_string();
-                app.set_ethernet_banner(ToastKind::Error, msg.clone());
                 app.set_toast(ToastKind::Error, msg);
             }
         }

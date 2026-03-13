@@ -77,7 +77,7 @@ fn render_details(app: &mut App, frame: &mut Frame, area: Rect) {
         if let Some(msg) = &app.last_action {
             lines.push(Line::from(""));
             lines.push(Line::from(vec![
-                Span::from("Last: ").bold(),
+                Span::from("Last action: ").bold(),
                 Span::from(msg.clone()).fg(Color::Cyan),
             ]));
         }

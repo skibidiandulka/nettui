@@ -37,17 +37,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 
     components::render_footer(app, frame, chunks[2]);
 
-    if let Some(banner) = app.current_tab_banner() {
-        components::render_center_banner(frame, banner);
-    }
-
-    if app.active_tab == ActiveTab::Wifi
-        && let Some(banner) = app.wifi_status_banner()
-    {
-        components::render_top_banner(frame, &banner);
-    }
-
-    if let Some(t) = &app.toast {
-        components::render_toast_popup(frame, t.kind, &t.msg);
+    for (index, toast) in app.visible_toasts().iter().enumerate() {
+        components::render_toast_popup(frame, toast.kind, &toast.msg, index as u16);
     }
 }
