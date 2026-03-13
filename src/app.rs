@@ -72,16 +72,19 @@ pub struct App {
     pub toasts: VecDeque<Toast>,
     pub wifi_scan_pending: bool,
     pub wifi_connect_pending: bool,
+    pub ethernet_pending: bool,
     last_data_refresh_at: Instant,
     refresh_requested: bool,
     wifi_scan_started_at: Option<Instant>,
     wifi_connect_started_at: Option<Instant>,
+    ethernet_started_at: Option<Instant>,
     last_scan_request_at: Option<Instant>,
 
     wifi_backend: IwdBackend,
-    eth_backend: NetworkdBackend,
+    refresh_task: Option<JoinHandle<RefreshTaskOutput>>,
     wifi_scan_task: Option<JoinHandle<Result<()>>>,
     wifi_connect_task: Option<JoinHandle<Result<()>>>,
+    ethernet_task: Option<JoinHandle<Result<EthernetTaskOutput>>>,
     wifi_connect_context: Option<WifiConnectContext>,
 }
 
@@ -90,6 +93,19 @@ struct WifiConnectContext {
     ssid: String,
     disconnect: bool,
     used_passphrase: bool,
+}
+
+struct RefreshTaskOutput {
+    wifi: Result<WifiState, String>,
+    ethernet_ifaces: Result<Vec<EthernetIface>, String>,
+    wifi_iface_details: Option<EthernetIface>,
+}
+
+struct EthernetTaskOutput {
+    success_toast: String,
+    last_action: String,
+    notify_title: String,
+    notify_body: String,
 }
 
 impl App {
@@ -136,15 +152,18 @@ impl App {
             toasts: VecDeque::new(),
             wifi_scan_pending: false,
             wifi_connect_pending: false,
+            ethernet_pending: false,
             last_data_refresh_at: now,
             refresh_requested: false,
             wifi_scan_started_at: None,
             wifi_connect_started_at: None,
+            ethernet_started_at: None,
             last_scan_request_at: None,
             wifi_backend,
-            eth_backend,
+            refresh_task: None,
             wifi_scan_task: None,
             wifi_connect_task: None,
+            ethernet_task: None,
             wifi_connect_context: None,
         };
 
@@ -171,37 +190,65 @@ impl App {
         if self.refresh_requested
             || refresh_due(self.last_data_refresh_at, self.config.data_refresh_ms, now)
         {
-            self.refresh_all().await;
+            self.spawn_refresh_if_needed();
             self.refresh_requested = false;
-            self.last_data_refresh_at = now;
         }
         Ok(())
     }
 
     async fn refresh_all(&mut self) {
+        self.spawn_refresh_if_needed();
+        while self.refresh_task.is_some() {
+            self.poll_background_tasks().await;
+            tokio::task::yield_now().await;
+        }
+    }
+
+    fn spawn_refresh_if_needed(&mut self) {
+        if self.refresh_task.is_some() {
+            return;
+        }
+        self.refresh_task = Some(tokio::spawn(async move {
+            let wifi_backend = IwdBackend::new();
+            let eth_backend = NetworkdBackend::new();
+            let wifi = wifi_backend
+                .query_state()
+                .await
+                .map_err(|err| err.to_string());
+            let wifi_iface_details = wifi
+                .as_ref()
+                .ok()
+                .and_then(|wifi| wifi.ifaces.first())
+                .and_then(|iface| eth_backend.iface_details(iface).ok());
+            let ethernet_ifaces = eth_backend.list_ifaces().map_err(|err| err.to_string());
+            RefreshTaskOutput {
+                wifi,
+                ethernet_ifaces,
+                wifi_iface_details,
+            }
+        }));
+    }
+
+    fn apply_refresh_output(&mut self, output: RefreshTaskOutput) {
         let known_ssid = self.selected_known_ssid();
         let new_ssid = self.selected_new_ssid();
         let selected_eth = self.selected_eth_iface().map(|i| i.name.clone());
 
-        match self.wifi_backend.query_state().await {
+        match output.wifi {
             Ok(wifi) => {
                 self.wifi = wifi;
                 self.restore_wifi_selection(known_ssid, new_ssid);
-                self.wifi_iface_details = self
-                    .wifi
-                    .ifaces
-                    .first()
-                    .and_then(|iface| self.eth_backend.iface_details(iface).ok());
+                self.wifi_iface_details = output.wifi_iface_details;
                 if !self.wifi.has_adapter() {
                     self.push_toast(ToastKind::Error, "No Wi-Fi adapter detected");
                 }
             }
             Err(err) => {
-                self.push_toast(ToastKind::Error, shorten_banner_message(&err.to_string()));
+                self.push_toast(ToastKind::Error, shorten_banner_message(&err));
             }
         }
 
-        match self.eth_backend.list_ifaces() {
+        match output.ethernet_ifaces {
             Ok(ifaces) => {
                 self.ethernet = EthernetState { ifaces };
                 self.restore_ethernet_selection(selected_eth);
@@ -210,12 +257,13 @@ impl App {
                 }
             }
             Err(err) => {
-                self.push_toast(ToastKind::Error, shorten_banner_message(&err.to_string()));
+                self.push_toast(ToastKind::Error, shorten_banner_message(&err));
             }
         }
 
         self.ensure_valid_wifi_focus();
         self.last_error = None;
+        self.last_data_refresh_at = Instant::now();
     }
 
     pub async fn refresh_current(&mut self) {
@@ -357,7 +405,7 @@ impl App {
             .cloned()
             .collect::<Vec<_>>();
 
-        if let Some(status) = self.wifi_status_toast()
+        if let Some(status) = self.active_status_toast()
             && !visible.iter().any(|toast| toast.msg == status.msg)
         {
             visible.insert(0, status);
@@ -367,7 +415,7 @@ impl App {
         visible
     }
 
-    fn wifi_status_toast(&self) -> Option<Toast> {
+    fn active_status_toast(&self) -> Option<Toast> {
         if self.wifi_scan_pending {
             return Some(Toast {
                 kind: ToastKind::Info,
@@ -403,11 +451,69 @@ impl App {
             });
         }
 
+        if self.ethernet_pending {
+            return Some(Toast {
+                kind: ToastKind::Info,
+                msg: self
+                    .last_action
+                    .clone()
+                    .unwrap_or_else(|| "Running Ethernet action".to_string()),
+                until: None,
+            });
+        }
+
+        if self.refresh_task.is_some() {
+            return Some(Toast {
+                kind: ToastKind::Info,
+                msg: "Refreshing network state".to_string(),
+                until: None,
+            });
+        }
+
         None
     }
 
     pub fn clear_error(&mut self) {
         self.last_error = None;
+    }
+
+    pub fn block_if_busy(&mut self, attempted_action: &str) -> bool {
+        let Some(active) = self.active_operation_label() else {
+            return false;
+        };
+        self.set_toast(
+            ToastKind::Info,
+            format!("{active} is still running. Wait before {attempted_action}."),
+        );
+        true
+    }
+
+    pub fn is_busy(&self) -> bool {
+        self.wifi_scan_pending || self.wifi_connect_pending || self.ethernet_pending
+    }
+
+    fn active_operation_label(&self) -> Option<String> {
+        if self.wifi_connect_pending {
+            return Some(
+                self.wifi_connect_context
+                    .as_ref()
+                    .map(|ctx| {
+                        if ctx.disconnect {
+                            format!("Disconnecting from {}", ctx.ssid)
+                        } else {
+                            format!("Connecting to {}", ctx.ssid)
+                        }
+                    })
+                    .unwrap_or_else(|| "Wi-Fi connect".to_string()),
+            );
+        }
+        if self.wifi_scan_pending {
+            return Some("Wi-Fi scan".to_string());
+        }
+        if self.ethernet_pending {
+            return Some("Ethernet action".to_string());
+        }
+        None
     }
 
     fn push_toast(&mut self, kind: ToastKind, msg: impl Into<String>) {
@@ -707,61 +813,82 @@ impl App {
     }
 
     pub async fn ethernet_renew_dhcp(&mut self) -> Result<()> {
+        if self.ethernet_pending {
+            self.set_toast(ToastKind::Info, "Ethernet action already in progress");
+            return Ok(());
+        }
         let iface = self
             .selected_eth_iface()
             .map(|i| i.name.clone())
             .ok_or_else(|| std::io::Error::other("no ethernet interface selected"))?;
+        self.ethernet_pending = true;
+        self.ethernet_started_at = Some(Instant::now());
+        self.last_action = Some(format!("Renewing DHCP on {iface}..."));
+        self.ethernet_task = Some(tokio::spawn(async move {
+            let backend = NetworkdBackend::new();
+            let before = snapshot_eth(backend.iface_details(&iface).ok().as_ref());
+            let out = backend.renew_dhcp(&iface).await?;
+            let after = snapshot_eth(backend.iface_details(&iface).ok().as_ref());
 
-        let before = snapshot_eth(self.selected_eth_iface());
-        let out = self.eth_backend.renew_dhcp(&iface).await?;
-        self.refresh_all().await;
-        let after = snapshot_eth(self.selected_eth_iface());
+            let mut msg = format!("{iface}: DHCP renew requested");
+            if out.used_sudo {
+                msg.push_str(" (elevated)");
+            }
+            if !out.stdout.is_empty() {
+                msg.push_str(&format!("\nstdout: {}", out.stdout));
+            }
+            if !out.stderr.is_empty() {
+                msg.push_str(&format!("\nstderr: {}", out.stderr));
+            }
+            if before == after {
+                msg.push_str("\nNo visible change detected.");
+            }
+            msg.push_str(&format!("\nBefore: {before}\nAfter:  {after}"));
 
-        let mut msg = format!("{iface}: DHCP renew requested");
-        if out.used_sudo {
-            msg.push_str(" (elevated)");
-        }
-        if !out.stdout.is_empty() {
-            msg.push_str(&format!("\nstdout: {}", out.stdout));
-        }
-        if !out.stderr.is_empty() {
-            msg.push_str(&format!("\nstderr: {}", out.stderr));
-        }
-        if before == after {
-            msg.push_str("\nNo visible change detected.");
-        }
-        msg.push_str(&format!("\nBefore: {before}\nAfter:  {after}"));
-
-        self.last_action = Some(format!("Renewed DHCP on {iface}"));
-        self.set_toast(ToastKind::Success, msg);
-        self.notify("Ethernet", &format!("DHCP renew requested on {iface}"));
+            Ok(EthernetTaskOutput {
+                success_toast: msg,
+                last_action: format!("Renewed DHCP on {iface}"),
+                notify_title: "Ethernet".to_string(),
+                notify_body: format!("DHCP renew requested on {iface}"),
+            })
+        }));
         Ok(())
     }
 
     pub async fn ethernet_toggle_link(&mut self) -> Result<()> {
+        if self.ethernet_pending {
+            self.set_toast(ToastKind::Info, "Ethernet action already in progress");
+            return Ok(());
+        }
         let iface = self
             .selected_eth_iface()
             .cloned()
             .ok_or_else(|| std::io::Error::other("no ethernet interface selected"))?;
         let target_up = !(iface.operstate == "up" || iface.carrier == Some(true));
         let state_word = if target_up { "up" } else { "down" };
+        let iface_name = iface.name.clone();
+        self.ethernet_pending = true;
+        self.ethernet_started_at = Some(Instant::now());
+        self.last_action = Some(format!("{iface_name} link {state_word}..."));
+        self.ethernet_task = Some(tokio::spawn(async move {
+            let backend = NetworkdBackend::new();
+            let out = backend.set_link_admin_state(&iface_name, target_up).await?;
 
-        let out = self
-            .eth_backend
-            .set_link_admin_state(&iface.name, target_up)
-            .await?;
-        self.refresh_all().await;
+            let mut msg = format!("{iface_name}: link set {state_word}");
+            if out.used_sudo {
+                msg.push_str(" (elevated)");
+            }
+            if !out.stderr.is_empty() {
+                msg.push_str(&format!("\nstderr: {}", out.stderr));
+            }
 
-        let mut msg = format!("{}: link set {}", iface.name, state_word);
-        if out.used_sudo {
-            msg.push_str(" (elevated)");
-        }
-        if !out.stderr.is_empty() {
-            msg.push_str(&format!("\nstderr: {}", out.stderr));
-        }
-        self.last_action = Some(format!("{} link {}", iface.name, state_word));
-        self.set_toast(ToastKind::Success, msg);
-        self.notify("Ethernet", &format!("{} link {}", iface.name, state_word));
+            Ok(EthernetTaskOutput {
+                success_toast: msg,
+                last_action: format!("{iface_name} link {state_word}"),
+                notify_title: "Ethernet".to_string(),
+                notify_body: format!("{iface_name} link {state_word}"),
+            })
+        }));
         Ok(())
     }
 
@@ -775,6 +902,19 @@ impl App {
 
     async fn poll_background_tasks(&mut self) {
         let now = Instant::now();
+        if let Some(handle) = self.refresh_task.take() {
+            if handle.is_finished() {
+                match handle.await {
+                    Ok(output) => self.apply_refresh_output(output),
+                    Err(err) => {
+                        self.set_toast(ToastKind::Error, format!("Refresh task failed: {err}"))
+                    }
+                }
+            } else {
+                self.refresh_task = Some(handle);
+            }
+        }
+
         if self.wifi_scan_pending
             && self.wifi_scan_started_at.is_some_and(|started| {
                 now.duration_since(started) > Duration::from_millis(self.config.job_timeout_scan_ms)
@@ -801,6 +941,20 @@ impl App {
             self.wifi_connect_started_at = None;
             self.wifi_connect_context = None;
             self.set_toast(ToastKind::Error, "Wi-Fi connect/disconnect timed out");
+        }
+
+        if self.ethernet_pending
+            && self.ethernet_started_at.is_some_and(|started| {
+                now.duration_since(started)
+                    > Duration::from_millis(self.config.job_timeout_connect_ms)
+            })
+        {
+            if let Some(handle) = self.ethernet_task.take() {
+                handle.abort();
+            }
+            self.ethernet_pending = false;
+            self.ethernet_started_at = None;
+            self.set_toast(ToastKind::Error, "Ethernet action timed out");
         }
 
         if let Some(handle) = self.wifi_scan_task.take() {
@@ -878,6 +1032,29 @@ impl App {
                 }
             } else {
                 self.wifi_connect_task = Some(handle);
+            }
+        }
+
+        if let Some(handle) = self.ethernet_task.take() {
+            if handle.is_finished() {
+                self.ethernet_pending = false;
+                self.ethernet_started_at = None;
+                match handle.await {
+                    Ok(Ok(output)) => {
+                        self.last_action = Some(output.last_action.clone());
+                        self.set_toast(ToastKind::Success, output.success_toast);
+                        self.notify(&output.notify_title, &output.notify_body);
+                        self.request_refresh();
+                    }
+                    Ok(Err(err)) => {
+                        self.set_toast(ToastKind::Error, shorten_banner_message(&err.to_string()));
+                    }
+                    Err(err) => {
+                        self.set_toast(ToastKind::Error, format!("Ethernet task failed: {err}"));
+                    }
+                }
+            } else {
+                self.ethernet_task = Some(handle);
             }
         }
     }

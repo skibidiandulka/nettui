@@ -54,6 +54,9 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> Result<()>
         KeyCode::Char(c) if c.eq_ignore_ascii_case(&app.keybinds.up) => app.select_prev(),
 
         KeyCode::Char(c) if c.eq_ignore_ascii_case(&app.keybinds.refresh) => {
+            if app.block_if_busy("refreshing") {
+                return Ok(());
+            }
             app.clear_error();
             app.refresh_current().await;
         }
@@ -62,6 +65,9 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> Result<()>
             if app.active_tab == ActiveTab::Wifi
                 && c.eq_ignore_ascii_case(&app.keybinds.wifi_scan) =>
         {
+            if app.block_if_busy("starting another Wi-Fi scan") {
+                return Ok(());
+            }
             app.clear_error();
             app.wifi_scan().await?;
         }
@@ -82,6 +88,9 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> Result<()>
                 && app.wifi_focus == WifiFocus::KnownNetworks
                 && c.eq_ignore_ascii_case(&app.keybinds.wifi_forget) =>
         {
+            if app.block_if_busy("forgetting a network") {
+                return Ok(());
+            }
             app.clear_error();
             app.wifi_forget_selected().await?;
         }
@@ -91,6 +100,9 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> Result<()>
                 && app.wifi_focus == WifiFocus::KnownNetworks
                 && c.eq_ignore_ascii_case(&app.keybinds.wifi_autoconnect) =>
         {
+            if app.block_if_busy("changing autoconnect") {
+                return Ok(());
+            }
             app.clear_error();
             app.wifi_toggle_autoconnect_selected().await?;
         }
@@ -100,6 +112,9 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> Result<()>
                 && app.wifi_focus == WifiFocus::NewNetworks
                 && c.eq_ignore_ascii_case(&app.keybinds.wifi_hidden) =>
         {
+            if app.block_if_busy("opening hidden network connect") {
+                return Ok(());
+            }
             app.open_hidden_connect_prompt();
         }
 
@@ -110,6 +125,9 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> Result<()>
                     WifiFocus::KnownNetworks | WifiFocus::NewNetworks
                 ) =>
         {
+            if app.block_if_busy("changing Wi-Fi connection") {
+                return Ok(());
+            }
             app.clear_error();
             app.wifi_connect_or_disconnect().await?;
         }
@@ -125,6 +143,9 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> Result<()>
             if app.active_tab == ActiveTab::Ethernet
                 && c.eq_ignore_ascii_case(&app.keybinds.ethernet_renew) =>
         {
+            if app.block_if_busy("running Ethernet renew") {
+                return Ok(());
+            }
             app.clear_error();
             if let Err(e) = app.ethernet_renew_dhcp().await {
                 let msg = e.to_string();
@@ -133,6 +154,9 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> Result<()>
         }
 
         KeyCode::Enter if app.active_tab == ActiveTab::Ethernet => {
+            if app.block_if_busy("changing Ethernet link state") {
+                return Ok(());
+            }
             app.clear_error();
             if let Err(e) = app.ethernet_toggle_link().await {
                 let msg = e.to_string();
