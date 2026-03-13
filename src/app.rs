@@ -410,6 +410,40 @@ impl App {
         self.last_error = None;
     }
 
+    pub fn block_if_busy(&mut self, attempted_action: &str) -> bool {
+        let Some(active) = self.active_operation_label() else {
+            return false;
+        };
+        self.set_toast(
+            ToastKind::Info,
+            format!("{active} is still running. Wait before {attempted_action}."),
+        );
+        true
+    }
+
+    fn active_operation_label(&self) -> Option<String> {
+        if self.wifi_connect_pending {
+            return Some(
+                self.wifi_connect_context
+                    .as_ref()
+                    .map(|ctx| {
+                        if ctx.disconnect {
+                            format!("Disconnecting from {}", ctx.ssid)
+                        } else {
+                            format!("Connecting to {}", ctx.ssid)
+                        }
+                    })
+                    .unwrap_or_else(|| "Wi-Fi connection change".to_string()),
+            );
+        }
+
+        if self.wifi_scan_pending {
+            return Some("Wi-Fi scan".to_string());
+        }
+
+        None
+    }
+
     fn push_toast(&mut self, kind: ToastKind, msg: impl Into<String>) {
         let msg = msg.into();
         if self.toasts.iter().any(|toast| {
