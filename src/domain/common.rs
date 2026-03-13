@@ -33,3 +33,9 @@ pub struct Toast {
     pub msg: String,
     pub until: Instant,
 }
+
+#[derive(Debug, Clone)]
+pub struct Banner {
+    pub kind: ToastKind,
+    pub msg: String,
+}

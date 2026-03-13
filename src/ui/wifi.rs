@@ -85,7 +85,7 @@ fn render_known_networks(app: &mut App, frame: &mut Frame, area: Rect) {
                     ),
                     Cell::from("-"),
                 ])
-                .dark_gray(),
+                .style(secondary_row_style()),
             );
         }
     }
@@ -153,14 +153,14 @@ fn render_new_networks(app: &mut App, frame: &mut Frame, area: Rect) {
                     Cell::from(n.security.clone()),
                     Cell::from(n.signal.clone()),
                 ])
-                .dark_gray(),
+                .style(secondary_row_style()),
             );
         }
     }
 
     if rows.is_empty() {
         rows.push(Row::new(vec![
-            Cell::from("- no new networks -").dark_gray(),
+            Cell::from("- no new networks -").style(secondary_text_style()),
             Cell::from(""),
             Cell::from(""),
         ]));
@@ -264,6 +264,14 @@ fn section_block(title: &str, focused: bool) -> Block<'_> {
         .borders(Borders::ALL)
         .border_type(border_type)
         .border_style(Style::default().fg(border))
+}
+
+fn secondary_row_style() -> Style {
+    Style::default().fg(Color::Gray)
+}
+
+fn secondary_text_style() -> Style {
+    Style::default().fg(Color::Gray).bold()
 }
 
 fn render_hidden_connect_popup(app: &App, frame: &mut Frame) {

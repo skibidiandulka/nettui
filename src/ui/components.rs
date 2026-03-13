@@ -1,6 +1,6 @@
 use crate::{
     app::App,
-    domain::common::{ActiveTab, ToastKind, WifiFocus},
+    domain::common::{ActiveTab, Banner, ToastKind, WifiFocus},
 };
 use ratatui::{
     Frame,
@@ -100,6 +100,9 @@ pub fn render_footer(app: &App, frame: &mut Frame, area: Rect) {
                 Span::from(wifi_hidden).bold(),
                 Span::from(" hidden"),
                 Span::from(" | "),
+                Span::from(wifi_details).bold(),
+                Span::from(" more info"),
+                Span::from(" | "),
                 Span::from(wifi_scan).bold(),
                 Span::from(" scan"),
             ]),
@@ -134,25 +137,61 @@ pub fn render_footer(app: &App, frame: &mut Frame, area: Rect) {
     frame.render_widget(p, area);
 }
 
-pub fn render_error_popup(frame: &mut Frame, msg: &str) {
-    let area = centered_rect(80, 40, frame.area());
+pub fn render_center_banner(frame: &mut Frame, banner: &Banner) {
+    let color = match banner.kind {
+        ToastKind::Success => Color::Green,
+        ToastKind::Error => Color::Red,
+        ToastKind::Info => Color::Cyan,
+    };
+
+    let wrapped_lines = banner.msg.lines().count().max(1) as u16;
+    let width = frame.area().width.saturating_sub(10).clamp(36, 84);
+    let height = (wrapped_lines + 2).clamp(4, 7);
+    let area = centered_rect(
+        width_percent(width, frame.area().width),
+        height_percent(height, frame.area().height),
+        frame.area(),
+    );
     frame.render_widget(Clear, area);
 
     let block = Block::default()
-        .title(" Error ")
+        .title(" Notice ")
         .borders(Borders::ALL)
-        .border_type(BorderType::Thick)
-        .border_style(Style::default().fg(Color::Red));
-
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(color));
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    let p = Paragraph::new(msg)
-        .alignment(Alignment::Left)
+    let p = Paragraph::new(banner.msg.as_str())
+        .alignment(Alignment::Center)
         .style(Style::default().fg(Color::White))
         .wrap(ratatui::widgets::Wrap { trim: true });
-
     frame.render_widget(p, inner);
+}
+
+pub fn render_top_banner(frame: &mut Frame, banner: &Banner) {
+    let color = match banner.kind {
+        ToastKind::Success => Color::Green,
+        ToastKind::Error => Color::Red,
+        ToastKind::Info => Color::Cyan,
+    };
+    let width = frame.area().width.saturating_sub(8).clamp(30, 62);
+    let area = top_center_rect(width, 3, frame.area());
+    frame.render_widget(Clear, area);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(color));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+    frame.render_widget(
+        Paragraph::new(banner.msg.as_str())
+            .alignment(Alignment::Center)
+            .style(Style::default().fg(Color::White))
+            .wrap(ratatui::widgets::Wrap { trim: true }),
+        inner,
+    );
 }
 
 pub fn render_toast_popup(frame: &mut Frame, kind: ToastKind, msg: &str) {
@@ -236,4 +275,25 @@ fn top_right_rect(width: u16, height: u16, area: Rect) -> Rect {
         .saturating_add(area.width.saturating_sub(width + margin_x));
     let y = area.y.saturating_add(margin_y);
     Rect::new(x, y, width, height)
+}
+
+fn top_center_rect(width: u16, height: u16, area: Rect) -> Rect {
+    let width = width.min(area.width.saturating_sub(2));
+    let x = area.x.saturating_add(area.width.saturating_sub(width) / 2);
+    let y = area.y.saturating_add(1);
+    Rect::new(x, y, width, height)
+}
+
+fn width_percent(width: u16, total: u16) -> u16 {
+    if total == 0 {
+        return 100;
+    }
+    ((u32::from(width) * 100) / u32::from(total)).clamp(1, 100) as u16
+}
+
+fn height_percent(height: u16, total: u16) -> u16 {
+    if total == 0 {
+        return 100;
+    }
+    ((u32::from(height) * 100) / u32::from(total)).clamp(1, 100) as u16
 }

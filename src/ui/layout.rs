@@ -37,9 +37,14 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 
     components::render_footer(app, frame, chunks[2]);
 
-    if let Some(err) = &app.last_error {
-        components::render_error_popup(frame, err);
-        return;
+    if let Some(banner) = app.current_tab_banner() {
+        components::render_center_banner(frame, banner);
+    }
+
+    if app.active_tab == ActiveTab::Wifi
+        && let Some(banner) = app.wifi_status_banner()
+    {
+        components::render_top_banner(frame, &banner);
     }
 
     if let Some(t) = &app.toast {

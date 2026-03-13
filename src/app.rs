@@ -4,7 +4,7 @@
 use crate::{
     backend::{iwd::IwdBackend, networkd::NetworkdBackend, traits::EthernetBackend},
     domain::{
-        common::{ActiveTab, StartupTabPolicy, Toast, ToastKind, WifiFocus},
+        common::{ActiveTab, Banner, StartupTabPolicy, Toast, ToastKind, WifiFocus},
         ethernet::{EthernetIface, EthernetState},
         wifi::{WifiNetwork, WifiState},
     },
@@ -67,6 +67,8 @@ pub struct App {
     pub last_error: Option<String>,
     pub last_action: Option<String>,
     pub toast: Option<Toast>,
+    pub wifi_banner: Option<Banner>,
+    pub ethernet_banner: Option<Banner>,
     pub wifi_scan_pending: bool,
     pub wifi_connect_pending: bool,
     last_data_refresh_at: Instant,
@@ -131,6 +133,8 @@ impl App {
             last_error: None,
             last_action: None,
             toast: None,
+            wifi_banner: None,
+            ethernet_banner: None,
             wifi_scan_pending: false,
             wifi_connect_pending: false,
             last_data_refresh_at: now,
@@ -178,19 +182,42 @@ impl App {
         let new_ssid = self.selected_new_ssid();
         let selected_eth = self.selected_eth_iface().map(|i| i.name.clone());
 
-        if let Ok(wifi) = self.wifi_backend.query_state().await {
-            self.wifi = wifi;
-            self.restore_wifi_selection(known_ssid, new_ssid);
-            self.wifi_iface_details = self
-                .wifi
-                .ifaces
-                .first()
-                .and_then(|iface| self.eth_backend.iface_details(iface).ok());
+        match self.wifi_backend.query_state().await {
+            Ok(wifi) => {
+                self.wifi = wifi;
+                self.restore_wifi_selection(known_ssid, new_ssid);
+                self.wifi_iface_details = self
+                    .wifi
+                    .ifaces
+                    .first()
+                    .and_then(|iface| self.eth_backend.iface_details(iface).ok());
+                if self.wifi.has_adapter() {
+                    self.clear_wifi_banner_if_missing_adapter();
+                } else {
+                    self.set_wifi_banner(ToastKind::Error, "No Wi-Fi adapter detected");
+                }
+            }
+            Err(err) => {
+                self.set_wifi_banner(ToastKind::Error, shorten_banner_message(&err.to_string()));
+            }
         }
 
-        if let Ok(ifaces) = self.eth_backend.list_ifaces() {
-            self.ethernet = EthernetState { ifaces };
-            self.restore_ethernet_selection(selected_eth);
+        match self.eth_backend.list_ifaces() {
+            Ok(ifaces) => {
+                self.ethernet = EthernetState { ifaces };
+                self.restore_ethernet_selection(selected_eth);
+                if self.ethernet.ifaces.is_empty() {
+                    self.set_ethernet_banner(ToastKind::Error, "No Ethernet adapter detected");
+                } else {
+                    self.clear_ethernet_banner_if_missing_adapter();
+                }
+            }
+            Err(err) => {
+                self.set_ethernet_banner(
+                    ToastKind::Error,
+                    shorten_banner_message(&err.to_string()),
+                );
+            }
         }
 
         self.ensure_valid_wifi_focus();
@@ -331,12 +358,70 @@ impl App {
         });
     }
 
+    pub fn set_wifi_banner(&mut self, kind: ToastKind, msg: impl Into<String>) {
+        self.wifi_banner = Some(Banner {
+            kind,
+            msg: msg.into(),
+        });
+    }
+
+    pub fn set_ethernet_banner(&mut self, kind: ToastKind, msg: impl Into<String>) {
+        self.ethernet_banner = Some(Banner {
+            kind,
+            msg: msg.into(),
+        });
+    }
+
+    pub fn current_tab_banner(&self) -> Option<&Banner> {
+        match self.active_tab {
+            ActiveTab::Wifi => self.wifi_banner.as_ref(),
+            ActiveTab::Ethernet => self.ethernet_banner.as_ref(),
+        }
+    }
+
+    pub fn wifi_status_banner(&self) -> Option<Banner> {
+        if self.wifi_scan_pending {
+            return Some(Banner {
+                kind: ToastKind::Info,
+                msg: "Scanning for Wi-Fi networks".to_string(),
+            });
+        }
+
+        if let Some(ssid) = &self.wifi_passphrase_prompt_ssid {
+            return Some(Banner {
+                kind: ToastKind::Info,
+                msg: format!("Passphrase required for {ssid}"),
+            });
+        }
+
+        if self.wifi_connect_pending {
+            let msg = self
+                .wifi_connect_context
+                .as_ref()
+                .map(|ctx| {
+                    if ctx.disconnect {
+                        format!("Disconnecting from {}", ctx.ssid)
+                    } else {
+                        format!("Connecting to {}", ctx.ssid)
+                    }
+                })
+                .unwrap_or_else(|| "Connecting to Wi-Fi".to_string());
+            return Some(Banner {
+                kind: ToastKind::Info,
+                msg,
+            });
+        }
+
+        None
+    }
+
     pub fn clear_error(&mut self) {
         self.last_error = None;
     }
 
     pub fn toggle_wifi_details(&mut self) {
         if !self.wifi.has_adapter() {
+            self.set_wifi_banner(ToastKind::Error, "No Wi-Fi adapter found");
             self.set_toast(ToastKind::Error, "No Wi-Fi adapter found");
             return;
         }
@@ -421,6 +506,7 @@ impl App {
 
         match self.wifi_backend.connect_hidden(&ssid).await {
             Ok(()) => {
+                self.wifi_banner = None;
                 self.last_action = Some(format!("Connect hidden requested: {ssid}"));
                 self.set_toast(ToastKind::Info, format!("Connect hidden requested: {ssid}"));
                 self.notify("Wi-Fi", &format!("Connect hidden: {ssid}"));
@@ -429,6 +515,7 @@ impl App {
             }
             Err(e) => {
                 let msg = friendly_wifi_error("connect hidden network", &e);
+                self.set_wifi_banner(ToastKind::Error, msg.clone());
                 self.set_toast(ToastKind::Error, msg);
             }
         }
@@ -449,6 +536,7 @@ impl App {
             return;
         }
 
+        self.wifi_banner = None;
         self.last_action = Some(format!("Connecting to {ssid}..."));
         self.set_toast(ToastKind::Info, format!("Connecting to {ssid}..."));
         self.close_wifi_passphrase_prompt();
@@ -500,6 +588,7 @@ impl App {
         self.wifi_scan_pending = true;
         self.wifi_scan_started_at = Some(now);
         self.last_scan_request_at = Some(now);
+        self.wifi_banner = None;
         self.request_refresh();
         self.last_action = Some("Wi-Fi scan requested".to_string());
         self.set_toast(ToastKind::Info, "Wi-Fi scan requested...");
@@ -534,6 +623,7 @@ impl App {
 
         self.wifi_connect_pending = true;
         self.wifi_connect_started_at = Some(Instant::now());
+        self.wifi_banner = None;
         self.request_refresh();
         self.wifi_connect_context = Some(WifiConnectContext {
             ssid: ssid.clone(),
@@ -578,6 +668,7 @@ impl App {
 
         match self.wifi_backend.forget_known(&net.ssid).await {
             Ok(()) => {
+                self.wifi_banner = None;
                 self.last_action = Some(format!("Forgot network {}", net.ssid));
                 self.set_toast(ToastKind::Success, format!("Forgot network {}", net.ssid));
                 self.notify("Wi-Fi", &format!("Forgot network {}", net.ssid));
@@ -585,6 +676,7 @@ impl App {
             }
             Err(e) => {
                 let msg = friendly_wifi_error("forget known network", &e);
+                self.set_wifi_banner(ToastKind::Error, msg.clone());
                 self.set_toast(ToastKind::Error, msg);
             }
         }
@@ -607,6 +699,7 @@ impl App {
 
         match self.wifi_backend.toggle_autoconnect(&net.ssid).await {
             Ok(enabled) => {
+                self.wifi_banner = None;
                 let state = if enabled { "enabled" } else { "disabled" };
                 self.last_action = Some(format!("Autoconnect {} for {}", state, net.ssid));
                 self.set_toast(
@@ -618,6 +711,7 @@ impl App {
             }
             Err(e) => {
                 let msg = friendly_wifi_error("toggle autoconnect", &e);
+                self.set_wifi_banner(ToastKind::Error, msg.clone());
                 self.set_toast(ToastKind::Error, msg);
             }
         }
@@ -632,6 +726,7 @@ impl App {
 
         let before = snapshot_eth(self.selected_eth_iface());
         let out = self.eth_backend.renew_dhcp(&iface).await?;
+        self.ethernet_banner = None;
         self.refresh_all().await;
         let after = snapshot_eth(self.selected_eth_iface());
 
@@ -668,6 +763,7 @@ impl App {
             .eth_backend
             .set_link_admin_state(&iface.name, target_up)
             .await?;
+        self.ethernet_banner = None;
         self.refresh_all().await;
 
         let mut msg = format!("{}: link set {}", iface.name, state_word);
@@ -703,6 +799,7 @@ impl App {
             }
             self.wifi_scan_pending = false;
             self.wifi_scan_started_at = None;
+            self.set_wifi_banner(ToastKind::Error, "Wi-Fi scan timed out");
             self.set_toast(ToastKind::Error, "Wi-Fi scan timed out");
         }
 
@@ -718,6 +815,7 @@ impl App {
             self.wifi_connect_pending = false;
             self.wifi_connect_started_at = None;
             self.wifi_connect_context = None;
+            self.set_wifi_banner(ToastKind::Error, "Wi-Fi connect timed out");
             self.set_toast(ToastKind::Error, "Wi-Fi connect/disconnect timed out");
         }
 
@@ -727,6 +825,7 @@ impl App {
                 self.wifi_scan_started_at = None;
                 match handle.await {
                     Ok(Ok(())) => {
+                        self.wifi_banner = None;
                         self.last_action = Some("Wi-Fi scan completed".to_string());
                         self.set_toast(ToastKind::Success, "Wi-Fi scan completed");
                         self.notify("Wi-Fi", "Scan completed");
@@ -734,10 +833,13 @@ impl App {
                     }
                     Ok(Err(e)) => {
                         let msg = friendly_wifi_error("scan", &e);
+                        self.set_wifi_banner(ToastKind::Error, msg.clone());
                         self.set_toast(ToastKind::Error, msg);
                     }
                     Err(e) => {
-                        self.set_toast(ToastKind::Error, format!("scan task failed: {e}"));
+                        let msg = format!("Scan task failed: {e}");
+                        self.set_wifi_banner(ToastKind::Error, msg.clone());
+                        self.set_toast(ToastKind::Error, msg);
                     }
                 }
             } else {
@@ -753,6 +855,7 @@ impl App {
                 match handle.await {
                     Ok(Ok(())) => {
                         if let Some(ctx) = ctx {
+                            self.wifi_banner = None;
                             if ctx.disconnect {
                                 self.last_action = Some("Disconnected Wi-Fi".to_string());
                                 self.set_toast(
@@ -779,17 +882,24 @@ impl App {
                             && !ctx.used_passphrase
                         {
                             self.open_wifi_passphrase_prompt(ctx.ssid.clone());
+                            self.set_wifi_banner(
+                                ToastKind::Info,
+                                format!("Passphrase required for {}", ctx.ssid),
+                            );
                             self.set_toast(
                                 ToastKind::Info,
                                 format!("Passphrase required for {}", ctx.ssid),
                             );
                         } else {
                             let msg = friendly_wifi_error("connect/disconnect", &e);
+                            self.set_wifi_banner(ToastKind::Error, msg.clone());
                             self.set_toast(ToastKind::Error, msg);
                         }
                     }
                     Err(e) => {
-                        self.set_toast(ToastKind::Error, format!("connect task failed: {e}"));
+                        let msg = format!("Connect task failed: {e}");
+                        self.set_wifi_banner(ToastKind::Error, msg.clone());
+                        self.set_toast(ToastKind::Error, msg);
                     }
                 }
             } else {
@@ -954,6 +1064,26 @@ impl App {
             WifiFocus::Adapter => self.device_total_len() > 0,
         }
     }
+
+    fn clear_wifi_banner_if_missing_adapter(&mut self) {
+        if self
+            .wifi_banner
+            .as_ref()
+            .is_some_and(|banner| banner.msg == "No Wi-Fi adapter detected")
+        {
+            self.wifi_banner = None;
+        }
+    }
+
+    fn clear_ethernet_banner_if_missing_adapter(&mut self) {
+        if self
+            .ethernet_banner
+            .as_ref()
+            .is_some_and(|banner| banner.msg == "No Ethernet adapter detected")
+        {
+            self.ethernet_banner = None;
+        }
+    }
 }
 
 pub fn determine_start_tab(
@@ -1032,6 +1162,26 @@ fn scan_debounce_remaining(
 fn friendly_wifi_error(action: &str, err: &anyhow::Error) -> String {
     let msg = err.to_string();
     let lower = msg.to_lowercase();
+    if lower.contains("argument format is invalid")
+        || lower.contains("invalid passphrase")
+        || lower.contains("invalid psk")
+        || lower.contains("pre-shared key")
+        || lower.contains("4-way handshake")
+        || lower.contains("authentication failed")
+        || lower.contains("bad passphrase")
+        || lower.contains("wrong password")
+    {
+        return "Couldn't connect. Check the password and try again.".to_string();
+    }
+    if lower.contains("network not found") {
+        return "Couldn't find that Wi-Fi network.".to_string();
+    }
+    if lower.contains("no wifi station found") || lower.contains("no wifi adapter found") {
+        return "No Wi-Fi adapter found.".to_string();
+    }
+    if lower.contains("cannot access iwd service") {
+        return "Couldn't talk to iwd. Make sure the service is running.".to_string();
+    }
     if lower.contains("no agent registered") {
         return format!(
             "{} needs Wi-Fi credentials. Use connect again and enter passphrase.",
@@ -1048,13 +1198,29 @@ fn friendly_wifi_error(action: &str, err: &anyhow::Error) -> String {
             action
         );
     }
-    msg
+    shorten_banner_message(&msg)
 }
 
 fn is_no_agent_error(err: &anyhow::Error) -> bool {
     err.to_string()
         .to_lowercase()
         .contains("no agent registered")
+}
+
+fn shorten_banner_message(msg: &str) -> String {
+    let single_line = msg
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ");
+    let compact = single_line.split_whitespace().collect::<Vec<_>>().join(" ");
+    let mut shortened = compact;
+    if shortened.len() > 120 {
+        shortened.truncate(117);
+        shortened.push_str("...");
+    }
+    shortened
 }
 
 fn snapshot_eth(iface: Option<&EthernetIface>) -> String {
@@ -1192,5 +1358,22 @@ mod tests {
         let base = Instant::now();
         let remaining = scan_debounce_remaining(Some(base), 700, base + Duration::from_millis(701));
         assert!(remaining.is_none());
+    }
+
+    #[test]
+    fn friendly_wifi_error_simplifies_invalid_passphrase() {
+        let err = anyhow::anyhow!("Argument format is invalid");
+        assert_eq!(
+            friendly_wifi_error("connect/disconnect", &err),
+            "Couldn't connect. Check the password and try again."
+        );
+    }
+
+    #[test]
+    fn shorten_banner_message_compacts_and_truncates() {
+        let msg = "first line\n\nsecond line with many words ".repeat(10);
+        let shortened = shorten_banner_message(&msg);
+        assert!(!shortened.contains('\n'));
+        assert!(shortened.len() <= 120);
     }
 }

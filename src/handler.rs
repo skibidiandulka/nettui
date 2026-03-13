@@ -1,6 +1,6 @@
 use crate::{
     app::App,
-    domain::common::{ActiveTab, WifiFocus},
+    domain::common::{ActiveTab, ToastKind, WifiFocus},
 };
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -127,14 +127,18 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> Result<()>
         {
             app.clear_error();
             if let Err(e) = app.ethernet_renew_dhcp().await {
-                app.last_error = Some(e.to_string());
+                let msg = e.to_string();
+                app.set_ethernet_banner(ToastKind::Error, msg.clone());
+                app.set_toast(ToastKind::Error, msg);
             }
         }
 
         KeyCode::Enter if app.active_tab == ActiveTab::Ethernet => {
             app.clear_error();
             if let Err(e) = app.ethernet_toggle_link().await {
-                app.last_error = Some(e.to_string());
+                let msg = e.to_string();
+                app.set_ethernet_banner(ToastKind::Error, msg.clone());
+                app.set_toast(ToastKind::Error, msg);
             }
         }
 
