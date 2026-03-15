@@ -406,13 +406,14 @@ impl IwdBackend {
             .await?
             .context("no wifi device found")?;
         device.set_mode(Mode::Ap).await?;
+        write_ap_profile(ssid, passphrase).await?;
         let session = Session::new().await.context("cannot access iwd service")?;
         let access_point = session
             .access_points()
             .await?
             .pop()
             .context("no access point interface found")?;
-        access_point.start(ssid, passphrase).await?;
+        access_point.start_profile(ssid).await?;
         Ok(())
     }
 
@@ -434,6 +435,33 @@ impl IwdBackend {
             device.set_mode(Mode::Station).await?;
         }
         Ok(())
+    }
+
+    pub fn network_configuration_enabled(&self) -> bool {
+        let Ok(raw) = fs::read_to_string("/etc/iwd/main.conf") else {
+            return false;
+        };
+
+        let mut in_general = false;
+        for line in raw.lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') || line.starts_with(';') {
+                continue;
+            }
+            if line.starts_with('[') && line.ends_with(']') {
+                in_general = line.eq_ignore_ascii_case("[General]");
+                continue;
+            }
+            if in_general
+                && let Some((key, value)) = line.split_once('=')
+                && key
+                    .trim()
+                    .eq_ignore_ascii_case("EnableNetworkConfiguration")
+            {
+                return value.trim().eq_ignore_ascii_case("true");
+            }
+        }
+        false
     }
 }
 
@@ -484,6 +512,61 @@ async fn find_device_by_name(
         }
     }
     Ok(None)
+}
+
+async fn write_ap_profile(ssid: &str, passphrase: &str) -> Result<()> {
+    let dir = Path::new("/var/lib/iwd/ap");
+    let path = dir.join(format!("{ssid}.ap"));
+    let profile = format!(
+        "[General]\nChannel=6\n\n[Security]\nPassphrase={}\nPairwiseCiphers=CCMP-128\nGroupCipher=CCMP-128\n\n[IPv4]\n",
+        passphrase
+    );
+
+    if fs::create_dir_all(dir).is_ok() && fs::write(&path, &profile).is_ok() {
+        return Ok(());
+    }
+
+    let escaped_path = shell_escape_single_quotes(path.to_string_lossy().as_ref());
+    let shell_cmd = format!(
+        "mkdir -p /var/lib/iwd/ap && cat > '{}' <<'NETTUI_AP'\n{}\nNETTUI_AP",
+        escaped_path, profile
+    );
+
+    let pkexec = Command::new("pkexec")
+        .arg("sh")
+        .arg("-c")
+        .arg(&shell_cmd)
+        .output()
+        .await;
+    if let Ok(out) = pkexec
+        && out.status.success()
+    {
+        return Ok(());
+    }
+
+    let sudo = Command::new("sudo")
+        .arg("-n")
+        .arg("sh")
+        .arg("-c")
+        .arg(&shell_cmd)
+        .output()
+        .await
+        .context("failed to write iwd AP profile")?;
+    if sudo.status.success() {
+        return Ok(());
+    }
+
+    let stderr = String::from_utf8_lossy(&sudo.stderr).trim().to_string();
+    Err(std::io::Error::other(if stderr.is_empty() {
+        "failed to write iwd AP profile".to_string()
+    } else {
+        stderr
+    })
+    .into())
+}
+
+fn shell_escape_single_quotes(input: &str) -> String {
+    input.replace('\'', "'\"'\"'")
 }
 
 async fn load_known_meta(session: &Session) -> HashMap<String, KnownMeta> {

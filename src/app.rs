@@ -792,6 +792,13 @@ impl App {
             self.set_toast(ToastKind::Error, "Access point name cannot be empty");
             return;
         }
+        if ssid.contains('/') || ssid.contains('\n') || ssid.contains('\r') {
+            self.set_toast(
+                ToastKind::Error,
+                "Access point name cannot contain / or line breaks",
+            );
+            return;
+        }
         if passphrase.len() < 8 {
             self.set_toast(
                 ToastKind::Error,
@@ -1201,6 +1208,12 @@ impl App {
                                     ToastKind::Success,
                                     format!("Access point {ssid} started"),
                                 );
+                                if !self.wifi_backend.network_configuration_enabled() {
+                                    self.set_toast(
+                                        ToastKind::Info,
+                                        "iwd network configuration is disabled. AP clients may not get DHCP until /etc/iwd/main.conf enables [General] EnableNetworkConfiguration=true.",
+                                    );
+                                }
                                 self.notify("Wi-Fi", &format!("Access point {ssid} started"));
                             }
                             self.request_refresh();
