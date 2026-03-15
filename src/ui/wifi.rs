@@ -34,6 +34,9 @@ pub fn render(app: &mut App, frame: &mut Frame, area: Rect) {
     if app.wifi_ap_prompt_open {
         render_wifi_ap_popup(app, frame);
     }
+    if app.wifi_share_popup.is_some() {
+        render_wifi_share_popup(app, frame);
+    }
     if app.wifi_passphrase_prompt_ssid.is_some() {
         render_wifi_passphrase_popup(app, frame);
     }
@@ -525,7 +528,7 @@ fn render_wifi_passphrase_popup(app: &App, frame: &mut Frame) {
 }
 
 fn render_wifi_ap_popup(app: &App, frame: &mut Frame) {
-    let area = centered_rect(62, 42, frame.area());
+    let area = centered_rect(70, 54, frame.area());
     frame.render_widget(Clear, area);
 
     let block = Block::default()
@@ -540,7 +543,7 @@ fn render_wifi_ap_popup(app: &App, frame: &mut Frame) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Fill(1),
-            Constraint::Length(9),
+            Constraint::Length(15),
             Constraint::Fill(1),
         ])
         .split(inner);
@@ -553,6 +556,7 @@ fn render_wifi_ap_popup(app: &App, frame: &mut Frame) {
             Constraint::Length(1),
             Constraint::Length(3),
             Constraint::Length(1),
+            Constraint::Length(4),
         ])
         .split(content_area);
 
@@ -648,6 +652,100 @@ fn render_wifi_ap_popup(app: &App, frame: &mut Frame) {
             Span::from(" | "),
             Span::from("Esc").bold(),
             Span::from(" cancel"),
+        ]))
+        .alignment(Alignment::Center),
+        rows[4],
+    );
+
+    frame.render_widget(
+        Paragraph::new(vec![
+            Line::from(""),
+            Line::from("Hotspot support depends on the Wi-Fi adapter and driver.")
+                .style(Style::default().fg(Color::Yellow)),
+            Line::from(
+                "Some adapters can scan and connect normally but still fail in access point mode.",
+            )
+            .style(Style::default().fg(Color::Gray)),
+            Line::from(
+                "For DHCP in AP mode, iwd should enable [General] EnableNetworkConfiguration=true.",
+            )
+            .style(Style::default().fg(Color::Gray)),
+        ])
+        .alignment(Alignment::Left)
+        .wrap(ratatui::widgets::Wrap { trim: true }),
+        Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Fill(1),
+                Constraint::Length(56),
+                Constraint::Fill(1),
+            ])
+            .split(rows[5])[1],
+    );
+}
+
+fn render_wifi_share_popup(app: &App, frame: &mut Frame) {
+    let Some(share) = &app.wifi_share_popup else {
+        return;
+    };
+
+    let area = centered_rect(72, 82, frame.area());
+    frame.render_widget(Clear, area);
+
+    let block = Block::default()
+        .title(" Share Wi-Fi ")
+        .borders(Borders::ALL)
+        .border_type(BorderType::Thick)
+        .border_style(Style::default().fg(Color::Blue));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1),
+            Constraint::Min(12),
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+        ])
+        .margin(1)
+        .split(inner);
+
+    frame.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::from("SSID: ").bold(),
+            Span::from(share.ssid.as_str()).fg(Color::Cyan),
+        ]))
+        .alignment(Alignment::Center),
+        rows[0],
+    );
+
+    frame.render_widget(
+        Paragraph::new(share.qr_text.as_str()).alignment(Alignment::Center),
+        rows[1],
+    );
+
+    frame.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::from("Passphrase: ").bold(),
+            Span::from(share.passphrase.as_str())
+                .fg(Color::White)
+                .bg(Color::DarkGray),
+        ]))
+        .alignment(Alignment::Center),
+        rows[2],
+    );
+    frame.render_widget(
+        Paragraph::new("Scan the QR code or type the password on another device.")
+            .alignment(Alignment::Center)
+            .style(Style::default().fg(Color::Gray)),
+        rows[3],
+    );
+    frame.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::from("Esc").bold(),
+            Span::from(" close"),
         ]))
         .alignment(Alignment::Center),
         rows[4],

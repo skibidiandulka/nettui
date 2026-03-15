@@ -42,10 +42,12 @@ pub fn render_footer(app: &App, frame: &mut Frame, area: Rect) {
     let wifi_scan = app.keybinds.wifi_scan.to_string();
     let wifi_show_all = app.keybinds.wifi_show_all.to_string();
     let wifi_forget = app.keybinds.wifi_forget.to_string();
+    let wifi_share = app.keybinds.wifi_share.to_string();
     let wifi_autoconnect = app.keybinds.wifi_autoconnect.to_string();
     let wifi_hidden = app.keybinds.wifi_hidden.to_string();
     let wifi_details = app.keybinds.wifi_details.to_string();
     let wifi_access_point = app.keybinds.wifi_access_point.to_string();
+    let wifi_power = app.keybinds.wifi_power.to_string();
     let ethernet_renew = app.keybinds.ethernet_renew.to_string();
 
     let mut line1 = vec![
@@ -111,6 +113,9 @@ pub fn render_footer(app: &App, frame: &mut Frame, area: Rect) {
                 Span::from(wifi_forget).bold(),
                 Span::from(" forget"),
                 Span::from(" | "),
+                Span::from(wifi_share).bold(),
+                Span::from(" share"),
+                Span::from(" | "),
                 Span::from(wifi_autoconnect).bold(),
                 Span::from(" autoconnect"),
                 Span::from(" | "),
@@ -153,6 +158,9 @@ pub fn render_footer(app: &App, frame: &mut Frame, area: Rect) {
                 Span::from(" | "),
                 Span::from(wifi_details).bold(),
                 Span::from(" details"),
+                Span::from(" | "),
+                Span::from(wifi_power).bold(),
+                Span::from(" power"),
                 Span::from(" | "),
                 Span::from(wifi_access_point).bold(),
                 Span::from(if app.wifi_access_point_active() {

@@ -6,6 +6,14 @@ use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> Result<()> {
+    if app.wifi_share_popup.is_some() {
+        match key_event.code {
+            KeyCode::Esc | KeyCode::Enter | KeyCode::Char(' ') => app.close_wifi_share_popup(),
+            _ => {}
+        }
+        return Ok(());
+    }
+
     if app.wifi_ap_prompt_open {
         match key_event.code {
             KeyCode::Esc => app.close_wifi_ap_prompt(),
@@ -115,6 +123,20 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> Result<()>
         KeyCode::Char(c)
             if app.active_tab == ActiveTab::Wifi
                 && app.wifi_focus == WifiFocus::KnownNetworks
+                && c.eq_ignore_ascii_case(&app.keybinds.wifi_share) =>
+        {
+            if app.block_if_busy("sharing a network") {
+                return Ok(());
+            }
+            app.clear_error();
+            if let Err(e) = app.wifi_share_selected().await {
+                app.set_toast(ToastKind::Error, e.to_string());
+            }
+        }
+
+        KeyCode::Char(c)
+            if app.active_tab == ActiveTab::Wifi
+                && app.wifi_focus == WifiFocus::KnownNetworks
                 && c.eq_ignore_ascii_case(&app.keybinds.wifi_autoconnect) =>
         {
             if app.block_if_busy("changing autoconnect") {
@@ -154,6 +176,20 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> Result<()>
                 && c.eq_ignore_ascii_case(&app.keybinds.wifi_details) =>
         {
             app.toggle_wifi_details();
+        }
+
+        KeyCode::Char(c)
+            if app.active_tab == ActiveTab::Wifi
+                && app.wifi_focus == WifiFocus::Adapter
+                && c.eq_ignore_ascii_case(&app.keybinds.wifi_power) =>
+        {
+            if app.block_if_busy("changing Wi-Fi power") {
+                return Ok(());
+            }
+            app.clear_error();
+            if let Err(e) = app.wifi_toggle_power().await {
+                app.set_toast(ToastKind::Error, e.to_string());
+            }
         }
 
         KeyCode::Char(c)

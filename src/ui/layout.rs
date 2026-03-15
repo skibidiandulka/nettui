@@ -35,7 +35,10 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         ActiveTab::Ethernet => ethernet::render(app, frame, chunks[1]),
     }
 
-    if app.wifi_passphrase_prompt_ssid.is_none() && !app.wifi_ap_prompt_open {
+    if app.wifi_passphrase_prompt_ssid.is_none()
+        && !app.wifi_ap_prompt_open
+        && app.wifi_share_popup.is_none()
+    {
         components::render_footer(app, frame, chunks[2]);
     }
 

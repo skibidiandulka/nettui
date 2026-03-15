@@ -14,7 +14,9 @@ This project was inspired by and builds upon ideas from Impala by pythops.
 - One TUI with two transport tabs: `Wi-Fi` and `Ethernet`
 - Startup tab policy: prefer active transport (`Ethernet` if active, else `Wi-Fi` if active
 - Connect/disconnect, forget, autoconnect toggle, hidden SSID connect
+- Known-network sharing popup with Wi-Fi QR code
 - Passphrase fallback flow when iwd reports `No Agent registered`
+- Wi-Fi adapter power toggle from the `Device` section
 - Ethernet details + link up/down + DHCP renew
 - Configurable keybinds via `~/.config/nettui/keybinds.toml`
 - Toast/error popups and terminal size guard (`119x35` minimum)
@@ -82,9 +84,12 @@ Wi-Fi tab:
 - `Enter`: connect/disconnect selected network
 - `a`: show/hide extra entries (`Known`: unavailable, `New`: hidden)
 - `d`: forget selected known network
+- `y`: share selected known network (in `Known`)
 - `t`: toggle autoconnect for selected known network
 - `n`: connect hidden network (in `New`)
 - `i`: toggle Wi-Fi details popup
+- `o`: toggle Wi-Fi adapter power (in `Device`)
+- `p`: start/stop access point
 - Empty `New Networks` list shows `- no new networks -`
 
 Ethernet tab:
