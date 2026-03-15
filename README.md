@@ -1,35 +1,39 @@
 <div align="center">
-  <h2>🖧 TUI for managing Wi-Fi and Ethernet</h2>
+  <h2>🖧 nettui</h2>
+  <p>TUI for Wi-Fi and Ethernet</p>
 </div>
-
-# nettui
 
 `nettui` is a unified terminal UI for Wi-Fi and Ethernet.
 
-It is a clean-room project inspired by the UX direction of tools like `impala` and `ethtui`, with one app shell and switchable Wi-Fi/Ethernet panels.  
-This project was inspired by and builds upon ideas from Impala by pythops.
+It is heavily inspired by `impala` and `ethtui`, but built as one app shell with switchable `Wi-Fi` and `Ethernet` panels.
+
+It is primarily meant for `Omarchy` and tested on `Omarchy`, but it should also work on other Linux distributions that use the same core stack:
+
+- `iwd`
+- `systemd-networkd`
+- `networkctl`
+- Nerd Fonts
 
 ## ✨ Features
 
-- One TUI with two transport tabs: `Wi-Fi` and `Ethernet`
-- Startup tab policy: prefer active transport (`Ethernet` if active, else `Wi-Fi` if active
-- Connect/disconnect, forget, autoconnect toggle, hidden SSID connect
-- Known-network sharing popup with Wi-Fi QR code
-- Passphrase fallback flow when iwd reports `No Agent registered`
-- Wi-Fi adapter power toggle from the `Device` section
-- Ethernet details + link up/down + DHCP renew
-- Configurable keybinds via `~/.config/nettui/keybinds.toml`
-- Toast/error popups and terminal size guard (`119x35` minimum)
+- `Wi-Fi` and `Ethernet`
+- Hidden SSID connect
+- QR Wi-Fi sharing
+- Wi-Fi power toggle
+- Access point mode
+- DHCP renew
+- Configurable keybinds
 
 ## 💡 Prerequisites
 
 - Linux
-- `iwd` running and reachable on D-Bus
-- `systemd-networkd` + `networkctl` available
-- Nerd Fonts recommended for icon rendering
+- `iwd` running on D-Bus
+- `systemd-networkd`
+- `networkctl`
+- Nerd Fonts recommended
 
 > [!IMPORTANT]
-> To avoid network stack conflicts, keep one wireless manager in control. If `iwd` is your backend, avoid running overlapping managers for Wi-Fi (for example `NetworkManager` or `wpa_supplicant`) at the same time.
+> `nettui` works best when `iwd` is the only active Wi-Fi manager. Avoid overlapping managers like `NetworkManager` or `wpa_supplicant`.
 
 ## 🚀 Installation
 
@@ -39,13 +43,13 @@ This project was inspired by and builds upon ideas from Impala by pythops.
 cargo install nettui
 ```
 
-### Arch Linux (AUR source build)
+### Arch Linux (AUR source)
 
 ```bash
 yay -S nettui
 ```
 
-### Arch Linux (AUR prebuilt binary)
+### Arch Linux (AUR binary)
 
 ```bash
 yay -S nettui-bin
@@ -57,88 +61,22 @@ yay -S nettui-bin
 nettui
 ```
 
-## 🩺 Troubleshooting
-
-- `scan` says `Wi-Fi scan already running`:
-  - previous scan is still in progress.
-- `scan` says `Wait ... ms before next scan`:
-  - debounce cooldown is active; retry after the short wait.
-- `Access point` starts but clients cannot join or do not receive IP:
-  - AP mode depends on Wi-Fi chipset, kernel driver, `iwd`, channel/regulatory domain, and client compatibility.
-  - `nettui` uses a conservative iwd AP profile, but hotspot mode is still hardware-dependent and cannot be guaranteed on every adapter.
-  - for DHCP in AP mode, `/etc/iwd/main.conf` must enable `[General] EnableNetworkConfiguration=true`.
-
-## ⌨️ Controls
-
-Global:
-
-- `h/l` or `←/→`: switch transport tab (`Wi-Fi` / `Ethernet`)
-- `j/k` or `↓/↑`: move selection
-- `r`: refresh (shows info toast)
-- `q` or `Esc`: quit
-
-Wi-Fi tab:
-
-- `Tab` / `Shift+Tab`: switch focus (`Known` / `New` / `Device`)
-- `s`: scan
-- `Enter`: connect/disconnect selected network
-- `a`: show/hide extra entries (`Known`: unavailable, `New`: hidden)
-- `d`: forget selected known network
-- `y`: share selected known network (in `Known`)
-- `t`: toggle autoconnect for selected known network
-- `n`: connect hidden network (in `New`)
-- `i`: toggle Wi-Fi details popup
-- `o`: toggle Wi-Fi adapter power (in `Device`)
-- `p`: start/stop access point
-- Empty `New Networks` list shows `- no new networks -`
-
-Ethernet tab:
-
-- `Enter`: toggle selected interface link (`up/down`)
-- `n`: renew DHCP on selected interface
-
-## ⚙️ Keybind config
-
-Config file path:
+On first launch, `nettui` creates:
 
 ```bash
 ~/.config/nettui/keybinds.toml
 ```
 
-On first launch, `nettui` auto-creates this file with defaults.
+## 🧩 Omarchy
 
-To reset from template:
-
-```bash
-mkdir -p ~/.config/nettui
-cp /usr/share/doc/nettui/keybinds.toml.example ~/.config/nettui/keybinds.toml
-```
-
-Edit this file directly and restart `nettui` after changes.
-
-## 🔄 Restart / control
-
-`nettui` is not a `systemd` service, so `systemctl` does not apply.
-
-Quick restart:
-
-```bash
-pkill -x nettui || true
-omarchy-launch-or-focus-tui nettui
-```
-
-## 🧩 Omarchy integration
-
-Official Omarchy `dev` launcher (`bin/omarchy-launch-wifi`) is:
+Official Omarchy currently launches `impala` for Wi-Fi:
 
 ```bash
 rfkill unblock wifi
 omarchy-launch-or-focus-tui impala
 ```
 
-So installing `nettui` alone does not replace Wi-Fi handling automatically.
-
-To use `nettui` instead of `impala` in your local Omarchy install:
+To switch your local Omarchy install to `nettui`:
 
 ```bash
 sed -i 's/omarchy-launch-or-focus-tui impala/omarchy-launch-or-focus-tui nettui/g' ~/.local/share/omarchy/bin/omarchy-launch-wifi
@@ -150,11 +88,57 @@ Verify:
 sed -n '1,120p' ~/.local/share/omarchy/bin/omarchy-launch-wifi
 ```
 
-Optional Hyprland size rule for `org.omarchy.nettui`:
+Optional Hyprland rule:
 
 ```bash
 grep -q "match:class org.omarchy.nettui" ~/.config/hypr/apps/system.conf || echo "windowrule = size 1190 735, match:class org.omarchy.nettui" >> ~/.config/hypr/apps/system.conf
 hyprctl reload
+```
+
+## ⌨️ Controls
+
+### Global
+
+- `h/l` or `←/→`: switch tab
+- `j/k` or `↓/↑`: move
+- `r`: refresh
+- `q` or `Esc`: quit
+
+### Wi-Fi
+
+- `Tab` / `Shift+Tab`: switch section
+- `s`: scan
+- `Enter`: connect or disconnect
+- `a`: show all
+- `d`: forget
+- `y`: share
+- `t`: autoconnect
+- `n`: hidden network
+- `i`: details
+- `o`: power
+- `p`: access point
+
+### Ethernet
+
+- `Enter`: link up/down
+- `n`: renew DHCP
+
+## 🩺 Notes
+
+- `Access point` mode is hardware-dependent.
+- Some adapters can scan and connect normally, but still fail in AP mode.
+- For DHCP in AP mode, `/etc/iwd/main.conf` should enable:
+
+```ini
+[General]
+EnableNetworkConfiguration=true
+```
+
+## 🔄 Restart
+
+```bash
+pkill -x nettui || true
+omarchy-launch-or-focus-tui nettui
 ```
 
 ## 🛠️ Build
@@ -165,20 +149,13 @@ cargo test
 cargo clippy --all-targets --all-features -- -D warnings
 ```
 
-## 📦 Maintainer Release Asset
+## 📦 Release Asset
 
 Always build the GitHub release tarball with:
 
 ```bash
 ./scripts/build-release-asset.sh
 ```
-
-This script enforces the archive layout expected by `nettui-bin` AUR:
-
-- `nettui-v<version>-x86_64/nettui`
-- `nettui-v<version>-x86_64/README.md`
-- `nettui-v<version>-x86_64/LICENSE`
-- `nettui-v<version>-x86_64/config/keybinds.toml.example`
 
 ## ⚖️ License
 
