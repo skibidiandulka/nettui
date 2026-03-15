@@ -61,6 +61,10 @@ nettui
   - previous scan is still in progress.
 - `scan` says `Wait ... ms before next scan`:
   - debounce cooldown is active; retry after the short wait.
+- `Access point` starts but clients cannot join or do not receive IP:
+  - AP mode depends on Wi-Fi chipset, kernel driver, `iwd`, channel/regulatory domain, and client compatibility.
+  - `nettui` uses a conservative iwd AP profile, but hotspot mode is still hardware-dependent and cannot be guaranteed on every adapter.
+  - for DHCP in AP mode, `/etc/iwd/main.conf` must enable `[General] EnableNetworkConfiguration=true`.
 
 ## ⌨️ Controls
 

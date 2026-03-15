@@ -518,7 +518,7 @@ async fn write_ap_profile(ssid: &str, passphrase: &str) -> Result<()> {
     let dir = Path::new("/var/lib/iwd/ap");
     let path = dir.join(format!("{ssid}.ap"));
     let profile = format!(
-        "[General]\nChannel=6\n\n[Security]\nPassphrase={}\nPairwiseCiphers=CCMP-128\nGroupCipher=CCMP-128\n\n[IPv4]\n",
+        "[General]\nChannel=1\n\n[Security]\nPassphrase={}\nPairwiseCiphers=CCMP-128\nGroupCipher=CCMP-128\n\n[IPv4]\n",
         passphrase
     );
 
