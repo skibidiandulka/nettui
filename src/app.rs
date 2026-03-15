@@ -63,6 +63,7 @@ pub struct App {
     pub hidden_ssid_input: String,
     pub wifi_passphrase_prompt_ssid: Option<String>,
     pub wifi_passphrase_input: String,
+    pub wifi_passphrase_visible: bool,
 
     pub ethernet: EthernetState,
     pub ethernet_state: TableState,
@@ -98,10 +99,10 @@ impl App {
         let wifi_backend = IwdBackend::new();
         let eth_backend = NetworkdBackend::new();
 
-        let wifi = wifi_backend
-            .query_state()
-            .await
-            .unwrap_or_else(|_| WifiState::empty());
+        let (wifi, wifi_start_error) = match wifi_backend.query_state().await {
+            Ok(wifi) => (wifi, None),
+            Err(err) => (WifiState::empty(), Some(err)),
+        };
         let ethernet = EthernetState {
             ifaces: eth_backend.list_ifaces().unwrap_or_default(),
         };
@@ -129,6 +130,7 @@ impl App {
             hidden_ssid_input: String::new(),
             wifi_passphrase_prompt_ssid: None,
             wifi_passphrase_input: String::new(),
+            wifi_passphrase_visible: false,
             ethernet,
             ethernet_state: TableState::default(),
             last_error: None,
@@ -150,6 +152,12 @@ impl App {
 
         app.init_wifi_states();
         app.init_ethernet_state();
+        if let Some(err) = wifi_start_error {
+            app.set_toast(
+                ToastKind::Error,
+                friendly_wifi_error("load Wi-Fi state", &err),
+            );
+        }
         if let Some(msg) = detect_conflicting_wifi_services().await {
             app.last_action = Some(msg.clone());
             app.set_toast(ToastKind::Info, msg);
@@ -192,12 +200,12 @@ impl App {
                     .ifaces
                     .first()
                     .and_then(|iface| self.eth_backend.iface_details(iface).ok());
-                if !self.wifi.has_adapter() {
-                    self.push_toast(ToastKind::Error, "No Wi-Fi adapter detected");
-                }
             }
             Err(err) => {
-                self.push_toast(ToastKind::Error, shorten_banner_message(&err.to_string()));
+                self.push_toast(
+                    ToastKind::Error,
+                    friendly_wifi_error("refresh Wi-Fi state", &err),
+                );
             }
         }
 
@@ -205,9 +213,6 @@ impl App {
             Ok(ifaces) => {
                 self.ethernet = EthernetState { ifaces };
                 self.restore_ethernet_selection(selected_eth);
-                if self.ethernet.ifaces.is_empty() {
-                    self.push_toast(ToastKind::Error, "No Ethernet adapter detected");
-                }
             }
             Err(err) => {
                 self.push_toast(ToastKind::Error, shorten_banner_message(&err.to_string()));
@@ -461,6 +466,14 @@ impl App {
         }
     }
 
+    fn has_recent_toast_message(&self, needle: &str) -> bool {
+        self.toasts
+            .iter()
+            .rev()
+            .take(3)
+            .any(|toast| toast.msg.contains(needle))
+    }
+
     pub fn toggle_wifi_details(&mut self) {
         if !self.wifi.has_adapter() {
             self.set_toast(ToastKind::Error, "No Wi-Fi adapter found");
@@ -523,11 +536,13 @@ impl App {
     pub fn open_wifi_passphrase_prompt(&mut self, ssid: String) {
         self.wifi_passphrase_prompt_ssid = Some(ssid);
         self.wifi_passphrase_input.clear();
+        self.wifi_passphrase_visible = false;
     }
 
     pub fn close_wifi_passphrase_prompt(&mut self) {
         self.wifi_passphrase_prompt_ssid = None;
         self.wifi_passphrase_input.clear();
+        self.wifi_passphrase_visible = false;
     }
 
     pub fn passphrase_input_push(&mut self, c: char) {
@@ -536,6 +551,10 @@ impl App {
 
     pub fn passphrase_input_backspace(&mut self) {
         self.wifi_passphrase_input.pop();
+    }
+
+    pub fn toggle_passphrase_visibility(&mut self) {
+        self.wifi_passphrase_visible = !self.wifi_passphrase_visible;
     }
 
     pub async fn submit_hidden_connect(&mut self) {
@@ -834,7 +853,9 @@ impl App {
             self.wifi_connect_pending = false;
             self.wifi_connect_started_at = None;
             self.wifi_connect_context = None;
-            self.set_toast(ToastKind::Error, "Wi-Fi connect/disconnect timed out");
+            if !self.has_recent_toast_message("Couldn't talk to iwd.") {
+                self.set_toast(ToastKind::Error, "Wi-Fi connect/disconnect timed out");
+            }
         }
 
         if let Some(handle) = self.wifi_scan_task.take() {
@@ -1166,6 +1187,12 @@ fn friendly_wifi_error(action: &str, err: &anyhow::Error) -> String {
     }
     if lower.contains("no wifi station found") || lower.contains("no wifi adapter found") {
         return "No Wi-Fi adapter found.".to_string();
+    }
+    if lower.contains("org.freedesktop.dbus.error.noreply")
+        || lower.contains("remote peer disconnected")
+        || lower.contains("connection reset by peer")
+    {
+        return "Couldn't talk to iwd. Restart nettui and try again.".to_string();
     }
     if lower.contains("cannot access iwd service") {
         return "Couldn't talk to iwd. Make sure the service is running.".to_string();

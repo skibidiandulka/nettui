@@ -9,6 +9,7 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> Result<()>
     if app.wifi_passphrase_prompt_ssid.is_some() {
         match key_event.code {
             KeyCode::Esc => app.close_wifi_passphrase_prompt(),
+            KeyCode::Tab | KeyCode::BackTab => app.toggle_passphrase_visibility(),
             KeyCode::Enter => app.submit_wifi_passphrase_connect().await,
             KeyCode::Backspace => app.passphrase_input_backspace(),
             KeyCode::Char(c) if !key_event.modifiers.contains(KeyModifiers::CONTROL) => {

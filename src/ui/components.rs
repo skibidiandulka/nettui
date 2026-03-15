@@ -190,7 +190,7 @@ pub fn render_too_small(frame: &mut Frame, area: Rect, min_w: u16, min_h: u16) {
 
 fn top_right_rect(width: u16, height: u16, area: Rect, stack_index: u16) -> Rect {
     let margin_x: u16 = 1;
-    let margin_y: u16 = 1;
+    let margin_y: u16 = 4;
     let width = width.min(area.width.saturating_sub(margin_x.saturating_mul(2)));
     let height = height.min(area.height.saturating_sub(margin_y.saturating_mul(2)));
     let x = area

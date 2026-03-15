@@ -35,7 +35,9 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         ActiveTab::Ethernet => ethernet::render(app, frame, chunks[1]),
     }
 
-    components::render_footer(app, frame, chunks[2]);
+    if app.wifi_passphrase_prompt_ssid.is_none() {
+        components::render_footer(app, frame, chunks[2]);
+    }
 
     for (index, toast) in app.visible_toasts().iter().enumerate() {
         components::render_toast_popup(frame, toast.kind, &toast.msg, index as u16);

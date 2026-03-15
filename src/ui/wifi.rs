@@ -4,7 +4,7 @@
 use crate::{app::App, domain::common::WifiFocus, domain::wifi::WifiDeviceInfo};
 use ratatui::{
     Frame,
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Cell, Clear, Paragraph, Row, Table},
@@ -310,7 +310,7 @@ fn render_wifi_passphrase_popup(app: &App, frame: &mut Frame) {
         return;
     };
 
-    let area = centered_rect(62, 32, frame.area());
+    let area = centered_rect(62, 38, frame.area());
     frame.render_widget(Clear, area);
 
     let block = Block::default()
@@ -321,7 +321,20 @@ fn render_wifi_passphrase_popup(app: &App, frame: &mut Frame) {
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    let masked = "*".repeat(app.wifi_passphrase_input.chars().count());
+    let passphrase = if app.wifi_passphrase_visible {
+        app.wifi_passphrase_input.clone()
+    } else {
+        "*".repeat(app.wifi_passphrase_input.chars().count())
+    };
+    let outer = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Fill(1),
+            Constraint::Length(8),
+            Constraint::Fill(1),
+        ])
+        .split(inner);
+    let content_area = outer[1];
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -329,38 +342,67 @@ fn render_wifi_passphrase_popup(app: &App, frame: &mut Frame) {
             Constraint::Length(1),
             Constraint::Length(3),
             Constraint::Length(1),
-            Constraint::Length(1),
         ])
-        .split(inner);
+        .split(content_area);
+    let label_area = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Fill(1),
+            Constraint::Length(42),
+            Constraint::Fill(1),
+        ])
+        .split(chunks[0])[1];
+    let field_area = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Fill(1),
+            Constraint::Length(42),
+            Constraint::Fill(1),
+        ])
+        .split(chunks[2])[1];
 
     let content = vec![Line::from(vec![
         Span::from("SSID: ").bold(),
         Span::from(ssid).fg(Color::Cyan),
     ])];
-    frame.render_widget(Paragraph::new(content), chunks[0]);
+    frame.render_widget(Paragraph::new(content), label_area);
 
     frame.render_widget(
         Paragraph::new(Line::from("Passphrase:").style(Style::default().bold())),
-        chunks[1],
+        Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Fill(1),
+                Constraint::Length(42),
+                Constraint::Fill(1),
+            ])
+            .split(chunks[1])[1],
     );
 
     let field_block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Cyan))
         .border_type(BorderType::Rounded);
-    let field_inner = field_block.inner(chunks[2]);
-    frame.render_widget(field_block, chunks[2]);
-    frame.render_widget(Paragraph::new(Line::from(Span::from(masked))), field_inner);
+    let field_inner = field_block.inner(field_area);
+    frame.render_widget(field_block, field_area);
+    frame.render_widget(
+        Paragraph::new(Line::from(Span::from(passphrase))).alignment(Alignment::Center),
+        field_inner,
+    );
 
     frame.render_widget(
         Paragraph::new(Line::from(vec![
+            Span::from("⇥").bold(),
+            Span::from(" show/hide"),
+            Span::from(" | "),
             Span::from("↵").bold(),
             Span::from(" connect"),
             Span::from(" | "),
             Span::from("Esc").bold(),
             Span::from(" cancel"),
-        ])),
-        chunks[4],
+        ]))
+        .alignment(Alignment::Center),
+        chunks[3],
     );
 }
 
