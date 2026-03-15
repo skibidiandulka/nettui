@@ -1,7 +1,11 @@
 // Copyright (C) 2026 skibidiandulka
 // Clean-room implementation inspired by Impala UX by pythops.
 
-use crate::{app::App, domain::common::WifiFocus, domain::wifi::WifiDeviceInfo};
+use crate::{
+    app::{App, WifiApPromptField},
+    domain::common::WifiFocus,
+    domain::wifi::WifiDeviceInfo,
+};
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -27,6 +31,9 @@ pub fn render(app: &mut App, frame: &mut Frame, area: Rect) {
     if app.show_wifi_details {
         render_details_popup(app, frame);
     }
+    if app.wifi_ap_prompt_open {
+        render_wifi_ap_popup(app, frame);
+    }
     if app.wifi_passphrase_prompt_ssid.is_some() {
         render_wifi_passphrase_popup(app, frame);
     }
@@ -36,6 +43,11 @@ pub fn render(app: &mut App, frame: &mut Frame, area: Rect) {
 }
 
 fn render_known_networks(app: &mut App, frame: &mut Frame, area: Rect) {
+    if app.wifi_access_point_active() {
+        render_access_point_status(app, frame, area);
+        return;
+    }
+
     let focused = app.wifi_focus == WifiFocus::KnownNetworks;
     let title = if app.wifi_connect_active() {
         " Known Networks (Connecting) ".to_string()
@@ -124,6 +136,11 @@ fn render_known_networks(app: &mut App, frame: &mut Frame, area: Rect) {
 }
 
 fn render_new_networks(app: &mut App, frame: &mut Frame, area: Rect) {
+    if app.wifi_access_point_active() {
+        render_access_point_clients(app, frame, area);
+        return;
+    }
+
     let focused = app.wifi_focus == WifiFocus::NewNetworks;
     let title = if app.wifi_scanning_active() {
         " New Networks (Scanning) ".to_string()
@@ -185,6 +202,107 @@ fn render_new_networks(app: &mut App, frame: &mut Frame, area: Rect) {
     } else {
         Style::default()
     });
+
+    frame.render_stateful_widget(table, area, &mut app.wifi_new_state);
+}
+
+fn render_access_point_status(app: &mut App, frame: &mut Frame, area: Rect) {
+    let focused = app.wifi_focus == WifiFocus::KnownNetworks;
+    let title = if app.wifi_ap_pending {
+        " Access Point (Updating) "
+    } else {
+        " Access Point "
+    };
+    let rows = vec![Row::new(vec![
+        Cell::from(
+            app.wifi
+                .access_point_ssid
+                .clone()
+                .unwrap_or_else(|| "-".to_string()),
+        ),
+        Cell::from(
+            app.wifi
+                .access_point_iface
+                .clone()
+                .or_else(|| app.wifi.device.as_ref().map(|device| device.iface.clone()))
+                .unwrap_or_else(|| "-".to_string()),
+        ),
+        Cell::from(
+            app.wifi
+                .device
+                .as_ref()
+                .map(|device| device.state.clone())
+                .unwrap_or_else(|| "-".to_string()),
+        ),
+        Cell::from(
+            app.wifi
+                .device
+                .as_ref()
+                .map(|device| device.frequency.clone())
+                .unwrap_or_else(|| "-".to_string()),
+        ),
+        Cell::from(
+            app.wifi
+                .device
+                .as_ref()
+                .map(|device| device.security.clone())
+                .unwrap_or_else(|| "-".to_string()),
+        ),
+    ])];
+
+    let table = Table::new(
+        rows,
+        [
+            Constraint::Length(24),
+            Constraint::Length(12),
+            Constraint::Length(12),
+            Constraint::Length(14),
+            Constraint::Length(14),
+        ],
+    )
+    .header(
+        Row::new(vec!["SSID", "Interface", "State", "Frequency", "Security"])
+            .style(Style::default().fg(Color::Yellow).bold())
+            .bottom_margin(1),
+    )
+    .block(section_block(title, focused))
+    .row_highlight_style(if focused {
+        Style::default().bg(Color::DarkGray).fg(Color::White)
+    } else {
+        Style::default()
+    });
+
+    frame.render_stateful_widget(table, area, &mut app.wifi_known_state);
+}
+
+fn render_access_point_clients(app: &mut App, frame: &mut Frame, area: Rect) {
+    let focused = app.wifi_focus == WifiFocus::NewNetworks;
+    let title = " Connected Devices ";
+    let mut rows: Vec<Row> = app
+        .wifi
+        .access_point_clients
+        .iter()
+        .map(|client| Row::new(vec![Cell::from(client.clone())]))
+        .collect();
+
+    if rows.is_empty() {
+        rows.push(Row::new(vec![
+            Cell::from("- no connected devices -").style(secondary_text_style()),
+        ]));
+    }
+
+    let table = Table::new(rows, [Constraint::Min(20)])
+        .header(
+            Row::new(vec!["Address"])
+                .style(Style::default().fg(Color::Yellow).bold())
+                .bottom_margin(1),
+        )
+        .block(section_block(title, focused))
+        .row_highlight_style(if focused {
+            Style::default().bg(Color::DarkGray).fg(Color::White)
+        } else {
+            Style::default()
+        });
 
     frame.render_stateful_widget(table, area, &mut app.wifi_new_state);
 }
@@ -403,6 +521,136 @@ fn render_wifi_passphrase_popup(app: &App, frame: &mut Frame) {
         ]))
         .alignment(Alignment::Center),
         chunks[3],
+    );
+}
+
+fn render_wifi_ap_popup(app: &App, frame: &mut Frame) {
+    let area = centered_rect(62, 42, frame.area());
+    frame.render_widget(Clear, area);
+
+    let block = Block::default()
+        .title(" Start Access Point ")
+        .borders(Borders::ALL)
+        .border_type(BorderType::Thick)
+        .border_style(Style::default().fg(Color::Blue));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let outer = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Fill(1),
+            Constraint::Length(9),
+            Constraint::Fill(1),
+        ])
+        .split(inner);
+    let content_area = outer[1];
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1),
+            Constraint::Length(3),
+            Constraint::Length(1),
+            Constraint::Length(3),
+            Constraint::Length(1),
+        ])
+        .split(content_area);
+
+    let ssid_area = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Fill(1),
+            Constraint::Length(42),
+            Constraint::Fill(1),
+        ])
+        .split(rows[1])[1];
+    let passphrase_area = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Fill(1),
+            Constraint::Length(42),
+            Constraint::Fill(1),
+        ])
+        .split(rows[3])[1];
+
+    frame.render_widget(
+        Paragraph::new(Line::from("SSID:").style(Style::default().bold())),
+        Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Fill(1),
+                Constraint::Length(42),
+                Constraint::Fill(1),
+            ])
+            .split(rows[0])[1],
+    );
+    frame.render_widget(
+        Paragraph::new(Line::from("Password:").style(Style::default().bold())),
+        Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Fill(1),
+                Constraint::Length(42),
+                Constraint::Fill(1),
+            ])
+            .split(rows[2])[1],
+    );
+
+    let ssid_block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(
+            Style::default().fg(if app.wifi_ap_prompt_field == WifiApPromptField::Ssid {
+                Color::Cyan
+            } else {
+                Color::Gray
+            }),
+        )
+        .border_type(BorderType::Rounded);
+    let ssid_inner = ssid_block.inner(ssid_area);
+    frame.render_widget(ssid_block, ssid_area);
+    frame.render_widget(
+        Paragraph::new(Line::from(app.wifi_ap_ssid_input.as_str())),
+        ssid_inner,
+    );
+
+    let passphrase_value = if app.wifi_ap_passphrase_visible {
+        app.wifi_ap_passphrase_input.clone()
+    } else {
+        "*".repeat(app.wifi_ap_passphrase_input.chars().count())
+    };
+    let passphrase_block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(
+            if app.wifi_ap_prompt_field == WifiApPromptField::Passphrase {
+                Color::Cyan
+            } else {
+                Color::Gray
+            },
+        ))
+        .border_type(BorderType::Rounded);
+    let passphrase_inner = passphrase_block.inner(passphrase_area);
+    frame.render_widget(passphrase_block, passphrase_area);
+    frame.render_widget(
+        Paragraph::new(Line::from(passphrase_value)),
+        passphrase_inner,
+    );
+
+    frame.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::from("↑/↓").bold(),
+            Span::from(" field"),
+            Span::from(" | "),
+            Span::from("⇥").bold(),
+            Span::from(" show/hide"),
+            Span::from(" | "),
+            Span::from("↵").bold(),
+            Span::from(" start AP"),
+            Span::from(" | "),
+            Span::from("Esc").bold(),
+            Span::from(" cancel"),
+        ]))
+        .alignment(Alignment::Center),
+        rows[4],
     );
 }
 

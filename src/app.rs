@@ -64,6 +64,11 @@ pub struct App {
     pub wifi_passphrase_prompt_ssid: Option<String>,
     pub wifi_passphrase_input: String,
     pub wifi_passphrase_visible: bool,
+    pub wifi_ap_prompt_open: bool,
+    pub wifi_ap_ssid_input: String,
+    pub wifi_ap_passphrase_input: String,
+    pub wifi_ap_passphrase_visible: bool,
+    pub wifi_ap_prompt_field: WifiApPromptField,
 
     pub ethernet: EthernetState,
     pub ethernet_state: TableState,
@@ -73,17 +78,21 @@ pub struct App {
     pub toasts: VecDeque<Toast>,
     pub wifi_scan_pending: bool,
     pub wifi_connect_pending: bool,
+    pub wifi_ap_pending: bool,
     last_data_refresh_at: Instant,
     refresh_requested: bool,
     wifi_scan_started_at: Option<Instant>,
     wifi_connect_started_at: Option<Instant>,
+    wifi_ap_started_at: Option<Instant>,
     last_scan_request_at: Option<Instant>,
 
     wifi_backend: IwdBackend,
     eth_backend: NetworkdBackend,
     wifi_scan_task: Option<JoinHandle<Result<()>>>,
     wifi_connect_task: Option<JoinHandle<Result<()>>>,
+    wifi_ap_task: Option<JoinHandle<Result<()>>>,
     wifi_connect_context: Option<WifiConnectContext>,
+    wifi_ap_context: Option<WifiApContext>,
 }
 
 #[derive(Debug, Clone)]
@@ -91,6 +100,18 @@ struct WifiConnectContext {
     ssid: String,
     disconnect: bool,
     used_passphrase: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WifiApPromptField {
+    Ssid,
+    Passphrase,
+}
+
+#[derive(Debug, Clone)]
+struct WifiApContext {
+    ssid: Option<String>,
+    stopping: bool,
 }
 
 impl App {
@@ -107,9 +128,10 @@ impl App {
             ifaces: eth_backend.list_ifaces().unwrap_or_default(),
         };
         let wifi_iface_details = wifi
-            .ifaces
-            .first()
-            .and_then(|iface| eth_backend.iface_details(iface).ok());
+            .device
+            .as_ref()
+            .map(|device| device.iface.clone())
+            .and_then(|iface| eth_backend.iface_details(&iface).ok());
         let active_tab = determine_start_tab(config.startup_policy, &wifi, &ethernet);
 
         let mut app = Self {
@@ -131,6 +153,11 @@ impl App {
             wifi_passphrase_prompt_ssid: None,
             wifi_passphrase_input: String::new(),
             wifi_passphrase_visible: false,
+            wifi_ap_prompt_open: false,
+            wifi_ap_ssid_input: String::new(),
+            wifi_ap_passphrase_input: String::new(),
+            wifi_ap_passphrase_visible: false,
+            wifi_ap_prompt_field: WifiApPromptField::Ssid,
             ethernet,
             ethernet_state: TableState::default(),
             last_error: None,
@@ -138,16 +165,20 @@ impl App {
             toasts: VecDeque::new(),
             wifi_scan_pending: false,
             wifi_connect_pending: false,
+            wifi_ap_pending: false,
             last_data_refresh_at: now,
             refresh_requested: false,
             wifi_scan_started_at: None,
             wifi_connect_started_at: None,
+            wifi_ap_started_at: None,
             last_scan_request_at: None,
             wifi_backend,
             eth_backend,
             wifi_scan_task: None,
             wifi_connect_task: None,
+            wifi_ap_task: None,
             wifi_connect_context: None,
+            wifi_ap_context: None,
         };
 
         app.init_wifi_states();
@@ -197,9 +228,10 @@ impl App {
                 self.restore_wifi_selection(known_ssid, new_ssid);
                 self.wifi_iface_details = self
                     .wifi
-                    .ifaces
-                    .first()
-                    .and_then(|iface| self.eth_backend.iface_details(iface).ok());
+                    .device
+                    .as_ref()
+                    .map(|device| device.iface.clone())
+                    .and_then(|iface| self.eth_backend.iface_details(&iface).ok());
             }
             Err(err) => {
                 self.push_toast(
@@ -381,6 +413,14 @@ impl App {
             });
         }
 
+        if self.wifi_ap_prompt_open {
+            return Some(Toast {
+                kind: ToastKind::Info,
+                msg: "Set up Wi-Fi access point".to_string(),
+                until: None,
+            });
+        }
+
         if let Some(ssid) = &self.wifi_passphrase_prompt_ssid {
             return Some(Toast {
                 kind: ToastKind::Info,
@@ -401,6 +441,28 @@ impl App {
                     }
                 })
                 .unwrap_or_else(|| "Connecting to Wi-Fi".to_string());
+            return Some(Toast {
+                kind: ToastKind::Info,
+                msg,
+                until: None,
+            });
+        }
+
+        if self.wifi_ap_pending {
+            let msg = self
+                .wifi_ap_context
+                .as_ref()
+                .map(|ctx| {
+                    if ctx.stopping {
+                        "Stopping access point".to_string()
+                    } else {
+                        format!(
+                            "Starting access point {}",
+                            ctx.ssid.clone().unwrap_or_else(|| "hotspot".to_string())
+                        )
+                    }
+                })
+                .unwrap_or_else(|| "Changing access point mode".to_string());
             return Some(Toast {
                 kind: ToastKind::Info,
                 msg,
@@ -439,6 +501,24 @@ impl App {
                         }
                     })
                     .unwrap_or_else(|| "Wi-Fi connection change".to_string()),
+            );
+        }
+
+        if self.wifi_ap_pending {
+            return Some(
+                self.wifi_ap_context
+                    .as_ref()
+                    .map(|ctx| {
+                        if ctx.stopping {
+                            "Stopping access point".to_string()
+                        } else {
+                            format!(
+                                "Starting access point {}",
+                                ctx.ssid.clone().unwrap_or_else(|| "hotspot".to_string())
+                            )
+                        }
+                    })
+                    .unwrap_or_else(|| "Access point change".to_string()),
             );
         }
 
@@ -557,7 +637,71 @@ impl App {
         self.wifi_passphrase_visible = !self.wifi_passphrase_visible;
     }
 
+    pub fn open_wifi_ap_prompt(&mut self) {
+        if !self.wifi.has_adapter() {
+            self.set_toast(ToastKind::Error, "No Wi-Fi adapter found");
+            return;
+        }
+        self.wifi_ap_prompt_open = true;
+        self.wifi_ap_ssid_input.clear();
+        self.wifi_ap_passphrase_input.clear();
+        self.wifi_ap_passphrase_visible = false;
+        self.wifi_ap_prompt_field = WifiApPromptField::Ssid;
+    }
+
+    pub fn close_wifi_ap_prompt(&mut self) {
+        self.wifi_ap_prompt_open = false;
+        self.wifi_ap_ssid_input.clear();
+        self.wifi_ap_passphrase_input.clear();
+        self.wifi_ap_passphrase_visible = false;
+        self.wifi_ap_prompt_field = WifiApPromptField::Ssid;
+    }
+
+    pub fn select_prev_wifi_ap_prompt_field(&mut self) {
+        self.wifi_ap_prompt_field = match self.wifi_ap_prompt_field {
+            WifiApPromptField::Ssid => WifiApPromptField::Ssid,
+            WifiApPromptField::Passphrase => WifiApPromptField::Ssid,
+        };
+    }
+
+    pub fn select_next_wifi_ap_prompt_field(&mut self) {
+        self.wifi_ap_prompt_field = match self.wifi_ap_prompt_field {
+            WifiApPromptField::Ssid => WifiApPromptField::Passphrase,
+            WifiApPromptField::Passphrase => WifiApPromptField::Passphrase,
+        };
+    }
+
+    pub fn toggle_wifi_ap_passphrase_visibility(&mut self) {
+        self.wifi_ap_passphrase_visible = !self.wifi_ap_passphrase_visible;
+    }
+
+    pub fn wifi_ap_input_push(&mut self, c: char) {
+        match self.wifi_ap_prompt_field {
+            WifiApPromptField::Ssid => self.wifi_ap_ssid_input.push(c),
+            WifiApPromptField::Passphrase => self.wifi_ap_passphrase_input.push(c),
+        }
+    }
+
+    pub fn wifi_ap_input_backspace(&mut self) {
+        match self.wifi_ap_prompt_field {
+            WifiApPromptField::Ssid => {
+                self.wifi_ap_ssid_input.pop();
+            }
+            WifiApPromptField::Passphrase => {
+                self.wifi_ap_passphrase_input.pop();
+            }
+        }
+    }
+
     pub async fn submit_hidden_connect(&mut self) {
+        if self.wifi_access_point_active() {
+            self.set_toast(
+                ToastKind::Info,
+                "Switch back to station mode before joining a Wi-Fi network",
+            );
+            return;
+        }
+
         let ssid = self.hidden_ssid_input.trim().to_string();
         if ssid.is_empty() {
             self.set_toast(ToastKind::Error, "SSID cannot be empty");
@@ -611,6 +755,70 @@ impl App {
         }));
     }
 
+    pub async fn wifi_toggle_access_point_mode(&mut self) -> Result<()> {
+        if self.wifi_ap_pending {
+            self.set_toast(ToastKind::Info, "Access point change already in progress");
+            return Ok(());
+        }
+        if !self.wifi.has_adapter() {
+            self.set_toast(ToastKind::Error, "No Wi-Fi adapter found");
+            return Ok(());
+        }
+
+        if self.wifi_access_point_active() {
+            let ssid = self.wifi.access_point_ssid.clone();
+            self.last_action = Some("Stopping Wi-Fi access point...".to_string());
+            self.wifi_ap_pending = true;
+            self.wifi_ap_started_at = Some(Instant::now());
+            self.wifi_ap_context = Some(WifiApContext {
+                ssid,
+                stopping: true,
+            });
+            self.wifi_ap_task = Some(tokio::spawn(async {
+                IwdBackend::new().stop_access_point().await
+            }));
+            return Ok(());
+        }
+
+        self.open_wifi_ap_prompt();
+        Ok(())
+    }
+
+    pub async fn submit_wifi_ap_start(&mut self) {
+        let ssid = self.wifi_ap_ssid_input.trim().to_string();
+        let passphrase = self.wifi_ap_passphrase_input.clone();
+
+        if ssid.is_empty() {
+            self.set_toast(ToastKind::Error, "Access point name cannot be empty");
+            return;
+        }
+        if passphrase.len() < 8 {
+            self.set_toast(
+                ToastKind::Error,
+                "Access point password must be at least 8 characters",
+            );
+            return;
+        }
+        if self.wifi_ap_pending {
+            self.set_toast(ToastKind::Info, "Access point change already in progress");
+            return;
+        }
+
+        self.last_action = Some(format!("Starting access point {ssid}..."));
+        self.close_wifi_ap_prompt();
+        self.wifi_ap_pending = true;
+        self.wifi_ap_started_at = Some(Instant::now());
+        self.wifi_ap_context = Some(WifiApContext {
+            ssid: Some(ssid.clone()),
+            stopping: false,
+        });
+        self.wifi_ap_task = Some(tokio::spawn(async move {
+            IwdBackend::new()
+                .start_access_point(&ssid, &passphrase)
+                .await
+        }));
+    }
+
     pub fn notify(&self, title: &str, body: &str) {
         let title = title.to_string();
         let body = body.to_string();
@@ -626,6 +834,14 @@ impl App {
     }
 
     pub async fn wifi_scan(&mut self) -> Result<()> {
+        if self.wifi_access_point_active() {
+            self.set_toast(
+                ToastKind::Info,
+                "Switch back to station mode before scanning for Wi-Fi networks",
+            );
+            return Ok(());
+        }
+
         let now = Instant::now();
         if self.wifi_scan_pending {
             self.set_toast(ToastKind::Info, "Wi-Fi scan already running");
@@ -651,6 +867,14 @@ impl App {
     }
 
     pub async fn wifi_connect_or_disconnect(&mut self) -> Result<()> {
+        if self.wifi_access_point_active() {
+            self.set_toast(
+                ToastKind::Info,
+                "Stop the access point before joining a Wi-Fi network",
+            );
+            return Ok(());
+        }
+
         if self.wifi_connect_pending {
             self.set_toast(
                 ToastKind::Info,
@@ -826,6 +1050,13 @@ impl App {
         self.wifi_connect_pending
     }
 
+    pub fn wifi_access_point_active(&self) -> bool {
+        self.wifi
+            .device
+            .as_ref()
+            .is_some_and(|device| device.mode == "access point")
+    }
+
     async fn poll_background_tasks(&mut self) {
         let now = Instant::now();
         if self.wifi_scan_pending
@@ -856,6 +1087,21 @@ impl App {
             if !self.has_recent_toast_message("Couldn't talk to iwd.") {
                 self.set_toast(ToastKind::Error, "Wi-Fi connect/disconnect timed out");
             }
+        }
+
+        if self.wifi_ap_pending
+            && self.wifi_ap_started_at.is_some_and(|started| {
+                now.duration_since(started)
+                    > Duration::from_millis(self.config.job_timeout_connect_ms)
+            })
+        {
+            if let Some(handle) = self.wifi_ap_task.take() {
+                handle.abort();
+            }
+            self.wifi_ap_pending = false;
+            self.wifi_ap_started_at = None;
+            self.wifi_ap_context = None;
+            self.set_toast(ToastKind::Error, "Access point change timed out");
         }
 
         if let Some(handle) = self.wifi_scan_task.take() {
@@ -935,9 +1181,49 @@ impl App {
                 self.wifi_connect_task = Some(handle);
             }
         }
+
+        if let Some(handle) = self.wifi_ap_task.take() {
+            if handle.is_finished() {
+                self.wifi_ap_pending = false;
+                self.wifi_ap_started_at = None;
+                let ctx = self.wifi_ap_context.take();
+                match handle.await {
+                    Ok(Ok(())) => {
+                        if let Some(ctx) = ctx {
+                            if ctx.stopping {
+                                self.last_action = Some("Stopped Wi-Fi access point".to_string());
+                                self.set_toast(ToastKind::Success, "Access point stopped");
+                                self.notify("Wi-Fi", "Access point stopped");
+                            } else {
+                                let ssid = ctx.ssid.unwrap_or_else(|| "hotspot".to_string());
+                                self.last_action = Some(format!("Started access point {ssid}"));
+                                self.set_toast(
+                                    ToastKind::Success,
+                                    format!("Access point {ssid} started"),
+                                );
+                                self.notify("Wi-Fi", &format!("Access point {ssid} started"));
+                            }
+                            self.request_refresh();
+                        }
+                    }
+                    Ok(Err(e)) => {
+                        let msg = friendly_wifi_error("change access point mode", &e);
+                        self.set_toast(ToastKind::Error, msg);
+                    }
+                    Err(e) => {
+                        self.set_toast(ToastKind::Error, format!("AP task failed: {e}"));
+                    }
+                }
+            } else {
+                self.wifi_ap_task = Some(handle);
+            }
+        }
     }
 
     fn known_total_len(&self) -> usize {
+        if self.wifi_access_point_active() {
+            return 1;
+        }
         self.wifi.known_networks.len()
             + if self.show_unavailable_known_networks {
                 self.wifi.unavailable_known_networks.len()
@@ -947,6 +1233,9 @@ impl App {
     }
 
     fn new_total_len(&self) -> usize {
+        if self.wifi_access_point_active() {
+            return self.wifi.access_point_clients.len().max(1);
+        }
         self.wifi.new_networks.len()
             + if self.show_hidden_networks {
                 self.wifi.hidden_networks.len()
@@ -960,6 +1249,9 @@ impl App {
     }
 
     fn selected_known_network(&self) -> Option<&WifiNetwork> {
+        if self.wifi_access_point_active() {
+            return None;
+        }
         let idx = self.wifi_known_state.selected()?;
         if idx < self.wifi.known_networks.len() {
             return self.wifi.known_networks.get(idx);
@@ -972,6 +1264,9 @@ impl App {
     }
 
     fn selected_new_network(&self) -> Option<&WifiNetwork> {
+        if self.wifi_access_point_active() {
+            return None;
+        }
         let idx = self.wifi_new_state.selected()?;
         if idx < self.wifi.new_networks.len() {
             return self.wifi.new_networks.get(idx);
@@ -1185,8 +1480,17 @@ fn friendly_wifi_error(action: &str, err: &anyhow::Error) -> String {
     if lower.contains("network not found") {
         return "Couldn't find that Wi-Fi network.".to_string();
     }
+    if lower.contains("not supported") || lower.contains("operation not available") {
+        return "This Wi-Fi adapter does not support that operation.".to_string();
+    }
+    if lower.contains("already exists") {
+        return "That access point is already active.".to_string();
+    }
     if lower.contains("no wifi station found") || lower.contains("no wifi adapter found") {
         return "No Wi-Fi adapter found.".to_string();
+    }
+    if lower.contains("no access point interface found") {
+        return "This Wi-Fi adapter cannot switch to access point mode.".to_string();
     }
     if lower.contains("org.freedesktop.dbus.error.noreply")
         || lower.contains("remote peer disconnected")
@@ -1307,7 +1611,11 @@ mod tests {
     fn startup_prefers_ethernet_when_active() {
         let wifi = WifiState {
             ifaces: vec!["wlan0".to_string()],
+            station_iface: Some("wlan0".to_string()),
+            access_point_iface: None,
             connected_ssid: Some("Home".to_string()),
+            access_point_ssid: None,
+            access_point_clients: vec![],
             known_networks: vec![],
             unavailable_known_networks: vec![],
             new_networks: vec![],
@@ -1338,7 +1646,11 @@ mod tests {
     fn startup_falls_back_to_wifi_if_no_active_ethernet() {
         let wifi = WifiState {
             ifaces: vec!["wlan0".to_string()],
+            station_iface: Some("wlan0".to_string()),
+            access_point_iface: None,
             connected_ssid: None,
+            access_point_ssid: None,
+            access_point_clients: vec![],
             known_networks: vec![],
             unavailable_known_networks: vec![],
             new_networks: vec![],

@@ -6,6 +6,22 @@ use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> Result<()> {
+    if app.wifi_ap_prompt_open {
+        match key_event.code {
+            KeyCode::Esc => app.close_wifi_ap_prompt(),
+            KeyCode::Tab | KeyCode::BackTab => app.toggle_wifi_ap_passphrase_visibility(),
+            KeyCode::Enter => app.submit_wifi_ap_start().await,
+            KeyCode::Up => app.select_prev_wifi_ap_prompt_field(),
+            KeyCode::Down => app.select_next_wifi_ap_prompt_field(),
+            KeyCode::Backspace => app.wifi_ap_input_backspace(),
+            KeyCode::Char(c) if !key_event.modifiers.contains(KeyModifiers::CONTROL) => {
+                app.wifi_ap_input_push(c)
+            }
+            _ => {}
+        }
+        return Ok(());
+    }
+
     if app.wifi_passphrase_prompt_ssid.is_some() {
         match key_event.code {
             KeyCode::Esc => app.close_wifi_passphrase_prompt(),
@@ -138,6 +154,17 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> Result<()>
                 && c.eq_ignore_ascii_case(&app.keybinds.wifi_details) =>
         {
             app.toggle_wifi_details();
+        }
+
+        KeyCode::Char(c)
+            if app.active_tab == ActiveTab::Wifi
+                && c.eq_ignore_ascii_case(&app.keybinds.wifi_access_point) =>
+        {
+            if app.block_if_busy("changing access point mode") {
+                return Ok(());
+            }
+            app.clear_error();
+            app.wifi_toggle_access_point_mode().await?;
         }
 
         KeyCode::Char(c)

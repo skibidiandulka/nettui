@@ -23,7 +23,11 @@ pub struct WifiDeviceInfo {
 #[derive(Debug, Clone)]
 pub struct WifiState {
     pub ifaces: Vec<String>,
+    pub station_iface: Option<String>,
+    pub access_point_iface: Option<String>,
     pub connected_ssid: Option<String>,
+    pub access_point_ssid: Option<String>,
+    pub access_point_clients: Vec<String>,
     pub known_networks: Vec<WifiNetwork>,
     pub unavailable_known_networks: Vec<WifiNetwork>,
     pub new_networks: Vec<WifiNetwork>,
@@ -35,7 +39,11 @@ impl WifiState {
     pub fn empty() -> Self {
         Self {
             ifaces: Vec::new(),
+            station_iface: None,
+            access_point_iface: None,
             connected_ssid: None,
+            access_point_ssid: None,
+            access_point_clients: Vec::new(),
             known_networks: Vec::new(),
             unavailable_known_networks: Vec::new(),
             new_networks: Vec::new(),

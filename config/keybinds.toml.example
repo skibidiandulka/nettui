@@ -15,5 +15,6 @@ wifi_forget = "d"
 wifi_autoconnect = "t"
 wifi_hidden = "n"
 wifi_details = "i"
+wifi_access_point = "p"
 
 ethernet_renew = "n"

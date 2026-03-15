@@ -45,6 +45,7 @@ pub fn render_footer(app: &App, frame: &mut Frame, area: Rect) {
     let wifi_autoconnect = app.keybinds.wifi_autoconnect.to_string();
     let wifi_hidden = app.keybinds.wifi_hidden.to_string();
     let wifi_details = app.keybinds.wifi_details.to_string();
+    let wifi_access_point = app.keybinds.wifi_access_point.to_string();
     let ethernet_renew = app.keybinds.ethernet_renew.to_string();
 
     let mut line1 = vec![
@@ -73,6 +74,32 @@ pub fn render_footer(app: &App, frame: &mut Frame, area: Rect) {
 
     let mut line2: Vec<Span> = Vec::new();
     match app.active_tab {
+        ActiveTab::Wifi if app.wifi_access_point_active() => match app.wifi_focus {
+            WifiFocus::KnownNetworks => line2.extend([
+                Span::from(wifi_access_point.clone()).bold(),
+                Span::from(" stop AP"),
+                Span::from(" | "),
+                Span::from(wifi_details.clone()).bold(),
+                Span::from(" details"),
+            ]),
+            WifiFocus::NewNetworks => line2.extend([
+                Span::from("↑,↓").bold(),
+                Span::from(" devices"),
+                Span::from(" | "),
+                Span::from(wifi_access_point.clone()).bold(),
+                Span::from(" stop AP"),
+                Span::from(" | "),
+                Span::from(wifi_details.clone()).bold(),
+                Span::from(" details"),
+            ]),
+            WifiFocus::Adapter => line2.extend([
+                Span::from(wifi_access_point).bold(),
+                Span::from(" stop AP"),
+                Span::from(" | "),
+                Span::from(wifi_details).bold(),
+                Span::from(" details"),
+            ]),
+        },
         ActiveTab::Wifi => match app.wifi_focus {
             WifiFocus::KnownNetworks => line2.extend([
                 Span::from("↵").bold(),
@@ -89,6 +116,13 @@ pub fn render_footer(app: &App, frame: &mut Frame, area: Rect) {
                 Span::from(" | "),
                 Span::from(wifi_scan.clone()).bold(),
                 Span::from(" scan"),
+                Span::from(" | "),
+                Span::from(wifi_access_point.clone()).bold(),
+                Span::from(if app.wifi_access_point_active() {
+                    " stop AP"
+                } else {
+                    " access point"
+                }),
             ]),
             WifiFocus::NewNetworks => line2.extend([
                 Span::from("↵").bold(),
@@ -105,6 +139,13 @@ pub fn render_footer(app: &App, frame: &mut Frame, area: Rect) {
                 Span::from(" | "),
                 Span::from(wifi_scan).bold(),
                 Span::from(" scan"),
+                Span::from(" | "),
+                Span::from(wifi_access_point.clone()).bold(),
+                Span::from(if app.wifi_access_point_active() {
+                    " stop AP"
+                } else {
+                    " access point"
+                }),
             ]),
             WifiFocus::Adapter => line2.extend([
                 Span::from(wifi_scan).bold(),
@@ -112,6 +153,13 @@ pub fn render_footer(app: &App, frame: &mut Frame, area: Rect) {
                 Span::from(" | "),
                 Span::from(wifi_details).bold(),
                 Span::from(" details"),
+                Span::from(" | "),
+                Span::from(wifi_access_point).bold(),
+                Span::from(if app.wifi_access_point_active() {
+                    " stop AP"
+                } else {
+                    " access point"
+                }),
             ]),
         },
         ActiveTab::Ethernet => {
