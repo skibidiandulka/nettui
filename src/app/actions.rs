@@ -71,6 +71,10 @@ impl App {
         self.wifi_auth_prompt = Some(WifiAuthPrompt::from_agent_request(request));
     }
 
+    pub fn open_wifi_enterprise_prompt(&mut self, ssid: String) {
+        self.wifi_enterprise_prompt = Some(WifiEnterprisePrompt::new(ssid));
+    }
+
     pub fn close_wifi_auth_prompt(&mut self) {
         if let Some(prompt) = self.wifi_auth_prompt.take() {
             prompt.cancel();
@@ -79,6 +83,10 @@ impl App {
 
     pub fn dismiss_wifi_auth_prompt(&mut self) {
         self.wifi_auth_prompt = None;
+    }
+
+    pub fn close_wifi_enterprise_prompt(&mut self) {
+        self.wifi_enterprise_prompt = None;
     }
 
     pub fn wifi_auth_input_push(&mut self, c: char) {
@@ -141,6 +149,98 @@ impl App {
             prompt.primary_visible = !prompt.primary_visible;
         } else if prompt.secondary_is_secret() {
             prompt.secondary_visible = !prompt.secondary_visible;
+        }
+    }
+
+    pub fn select_prev_wifi_enterprise_field(&mut self) {
+        if let Some(prompt) = self.wifi_enterprise_prompt.as_mut() {
+            prompt.move_prev();
+        }
+    }
+
+    pub fn select_next_wifi_enterprise_field(&mut self) {
+        if let Some(prompt) = self.wifi_enterprise_prompt.as_mut() {
+            prompt.move_next();
+        }
+    }
+
+    pub fn cycle_wifi_enterprise_left(&mut self) {
+        if let Some(prompt) = self.wifi_enterprise_prompt.as_mut() {
+            prompt.cycle_left();
+        }
+    }
+
+    pub fn cycle_wifi_enterprise_right(&mut self) {
+        if let Some(prompt) = self.wifi_enterprise_prompt.as_mut() {
+            prompt.cycle_right();
+        }
+    }
+
+    pub fn toggle_wifi_enterprise_visibility(&mut self) {
+        if let Some(prompt) = self.wifi_enterprise_prompt.as_mut() {
+            prompt.toggle_visibility();
+        }
+    }
+
+    pub fn wifi_enterprise_input_push(&mut self, c: char) {
+        let Some(prompt) = self.wifi_enterprise_prompt.as_mut() else {
+            return;
+        };
+        match prompt.focus {
+            WifiEnterprisePromptField::Identity => prompt.profile.identity.push(c),
+            WifiEnterprisePromptField::ServerDomainMask => {
+                prompt.profile.server_domain_mask.push(c);
+            }
+            WifiEnterprisePromptField::CaCert => prompt.profile.ca_cert.push(c),
+            WifiEnterprisePromptField::ClientCert => prompt.profile.client_cert.push(c),
+            WifiEnterprisePromptField::ClientKey => prompt.profile.client_key.push(c),
+            WifiEnterprisePromptField::KeyPassphrase => {
+                prompt.profile.key_passphrase.push(c);
+            }
+            WifiEnterprisePromptField::Phase2Identity => {
+                prompt.profile.phase2_identity.push(c);
+            }
+            WifiEnterprisePromptField::Phase2Password => {
+                prompt.profile.phase2_password.push(c);
+            }
+            WifiEnterprisePromptField::Password => prompt.profile.password.push(c),
+            WifiEnterprisePromptField::Method | WifiEnterprisePromptField::Phase2Method => {}
+        }
+    }
+
+    pub fn wifi_enterprise_input_backspace(&mut self) {
+        let Some(prompt) = self.wifi_enterprise_prompt.as_mut() else {
+            return;
+        };
+        match prompt.focus {
+            WifiEnterprisePromptField::Identity => {
+                prompt.profile.identity.pop();
+            }
+            WifiEnterprisePromptField::ServerDomainMask => {
+                prompt.profile.server_domain_mask.pop();
+            }
+            WifiEnterprisePromptField::CaCert => {
+                prompt.profile.ca_cert.pop();
+            }
+            WifiEnterprisePromptField::ClientCert => {
+                prompt.profile.client_cert.pop();
+            }
+            WifiEnterprisePromptField::ClientKey => {
+                prompt.profile.client_key.pop();
+            }
+            WifiEnterprisePromptField::KeyPassphrase => {
+                prompt.profile.key_passphrase.pop();
+            }
+            WifiEnterprisePromptField::Phase2Identity => {
+                prompt.profile.phase2_identity.pop();
+            }
+            WifiEnterprisePromptField::Phase2Password => {
+                prompt.profile.phase2_password.pop();
+            }
+            WifiEnterprisePromptField::Password => {
+                prompt.profile.password.pop();
+            }
+            WifiEnterprisePromptField::Method | WifiEnterprisePromptField::Phase2Method => {}
         }
     }
 
@@ -297,6 +397,54 @@ impl App {
         }
     }
 
+    pub async fn submit_wifi_enterprise_prompt(&mut self) {
+        let Some(prompt) = self.wifi_enterprise_prompt.take() else {
+            return;
+        };
+
+        if self.wifi_connect_pending {
+            self.set_toast(ToastKind::Info, "Wi-Fi connect already in progress");
+            self.wifi_enterprise_prompt = Some(prompt);
+            return;
+        }
+
+        if let Err(err) = prompt.profile.validate() {
+            self.set_toast(ToastKind::Error, err.to_string());
+            self.wifi_enterprise_prompt = Some(prompt);
+            return;
+        }
+
+        self.set_toast(
+            ToastKind::Info,
+            "Root access may be required to save enterprise Wi-Fi settings",
+        );
+        if let Err(err) = self
+            .wifi_backend
+            .write_enterprise_profile(&prompt.ssid, &prompt.profile)
+            .await
+        {
+            self.set_toast(
+                ToastKind::Error,
+                friendly_wifi_error("write enterprise profile", &err),
+            );
+            self.wifi_enterprise_prompt = Some(prompt);
+            return;
+        }
+
+        let ssid = prompt.ssid.clone();
+        self.last_action = Some(format!("Connecting to {ssid}..."));
+        self.wifi_connect_pending = true;
+        self.wifi_connect_started_at = Some(Instant::now());
+        self.wifi_connect_context = Some(WifiConnectContext {
+            ssid: ssid.clone(),
+            disconnect: false,
+            used_passphrase: false,
+        });
+        self.wifi_connect_task = Some(tokio::spawn(async move {
+            IwdBackend::new().connect(&ssid).await
+        }));
+    }
+
     pub async fn wifi_toggle_access_point_mode(&mut self) -> Result<()> {
         if self.wifi_ap_pending {
             self.set_toast(ToastKind::Info, "Access point change already in progress");
@@ -447,6 +595,11 @@ impl App {
 
         let ssid = net.ssid.clone();
         let disconnect = net.connected;
+
+        if !disconnect && net.is_enterprise() && self.wifi_focus == WifiFocus::NewNetworks {
+            self.open_wifi_enterprise_prompt(ssid);
+            return Ok(());
+        }
 
         self.wifi_connect_pending = true;
         self.wifi_connect_started_at = Some(Instant::now());

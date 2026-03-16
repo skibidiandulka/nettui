@@ -1,4 +1,5 @@
 use super::{IwdBackend, WifiShareCredentials, helpers::*};
+use crate::domain::wifi_enterprise::WifiEnterpriseProfile;
 use anyhow::{Context, Result};
 use iwdrs::{modes::Mode, session::Session};
 use std::fs;
@@ -158,6 +159,17 @@ impl IwdBackend {
             ssid: ssid.to_string(),
             passphrase,
         })
+    }
+
+    pub async fn write_enterprise_profile(
+        &self,
+        ssid: &str,
+        profile: &WifiEnterpriseProfile,
+    ) -> Result<()> {
+        let encoded_name = iwd_network_name(ssid);
+        let path = std::path::Path::new("/var/lib/iwd").join(format!("{encoded_name}.8021x"));
+        let contents = profile.to_iwd_profile()?;
+        write_protected_file(&path, &contents, "failed to write iwd enterprise profile").await
     }
 
     pub async fn start_access_point(&self, ssid: &str, passphrase: &str) -> Result<()> {

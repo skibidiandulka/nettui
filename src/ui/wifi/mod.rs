@@ -2,6 +2,7 @@
 // Clean-room implementation inspired by Impala UX by pythops.
 
 mod auth_popups;
+mod enterprise_popup;
 mod info_popups;
 mod panels;
 mod popup_layout;
@@ -28,5 +29,6 @@ pub fn render(app: &mut App, frame: &mut Frame, area: Rect) {
     panels::render_device(app, frame, chunks[2]);
 
     info_popups::render_info_popups(app, frame);
+    enterprise_popup::render_enterprise_popup(app, frame);
     auth_popups::render_auth_popups(app, frame);
 }

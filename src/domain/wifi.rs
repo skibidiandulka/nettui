@@ -60,3 +60,9 @@ impl WifiState {
         self.connected_ssid.is_some()
     }
 }
+
+impl WifiNetwork {
+    pub fn is_enterprise(&self) -> bool {
+        matches!(self.security.to_ascii_lowercase().as_str(), "eap" | "8021x")
+    }
+}

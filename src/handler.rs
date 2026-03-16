@@ -30,6 +30,24 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> Result<()>
         return Ok(());
     }
 
+    if app.wifi_enterprise_prompt.is_some() {
+        match key_event.code {
+            KeyCode::Esc => app.close_wifi_enterprise_prompt(),
+            KeyCode::Tab | KeyCode::BackTab => app.toggle_wifi_enterprise_visibility(),
+            KeyCode::Enter => app.submit_wifi_enterprise_prompt().await,
+            KeyCode::Up => app.select_prev_wifi_enterprise_field(),
+            KeyCode::Down => app.select_next_wifi_enterprise_field(),
+            KeyCode::Left => app.cycle_wifi_enterprise_left(),
+            KeyCode::Right => app.cycle_wifi_enterprise_right(),
+            KeyCode::Backspace => app.wifi_enterprise_input_backspace(),
+            KeyCode::Char(c) if !key_event.modifiers.contains(KeyModifiers::CONTROL) => {
+                app.wifi_enterprise_input_push(c)
+            }
+            _ => {}
+        }
+        return Ok(());
+    }
+
     if app.wifi_auth_prompt.is_some() {
         match key_event.code {
             KeyCode::Esc => app.close_wifi_auth_prompt(),

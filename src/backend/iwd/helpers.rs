@@ -51,47 +51,7 @@ pub(super) async fn write_ap_profile(ssid: &str, passphrase: &str) -> Result<()>
         passphrase
     );
 
-    if fs::create_dir_all(dir).is_ok() && fs::write(&path, &profile).is_ok() {
-        return Ok(());
-    }
-
-    let escaped_path = shell_escape_single_quotes(path.to_string_lossy().as_ref());
-    let shell_cmd = format!(
-        "mkdir -p /var/lib/iwd/ap && cat > '{}' <<'NETTUI_AP'\n{}\nNETTUI_AP",
-        escaped_path, profile
-    );
-
-    let pkexec = Command::new("pkexec")
-        .arg("sh")
-        .arg("-c")
-        .arg(&shell_cmd)
-        .output()
-        .await;
-    if let Ok(out) = pkexec
-        && out.status.success()
-    {
-        return Ok(());
-    }
-
-    let sudo = Command::new("sudo")
-        .arg("-n")
-        .arg("sh")
-        .arg("-c")
-        .arg(&shell_cmd)
-        .output()
-        .await
-        .context("failed to write iwd AP profile")?;
-    if sudo.status.success() {
-        return Ok(());
-    }
-
-    let stderr = String::from_utf8_lossy(&sudo.stderr).trim().to_string();
-    Err(std::io::Error::other(if stderr.is_empty() {
-        "failed to write iwd AP profile".to_string()
-    } else {
-        stderr
-    })
-    .into())
+    write_protected_file(&path, &profile, "failed to write iwd AP profile").await
 }
 
 pub(super) fn shell_escape_single_quotes(input: &str) -> String {
@@ -144,6 +104,63 @@ pub(super) async fn read_protected_file(path: &str) -> Result<String> {
     let stderr = String::from_utf8_lossy(&sudo.stderr).trim().to_string();
     Err(std::io::Error::other(if stderr.is_empty() {
         "failed to read iwd network profile".to_string()
+    } else {
+        stderr
+    })
+    .into())
+}
+
+pub(super) async fn write_protected_file(
+    path: &Path,
+    contents: &str,
+    error_context: &str,
+) -> Result<()> {
+    if let Some(parent) = path.parent()
+        && fs::create_dir_all(parent).is_ok()
+        && fs::write(path, contents).is_ok()
+    {
+        return Ok(());
+    }
+
+    let escaped_path = shell_escape_single_quotes(path.to_string_lossy().as_ref());
+    let parent = path
+        .parent()
+        .map(|value| value.to_string_lossy().to_string());
+    let mkdir = parent
+        .as_deref()
+        .map(shell_escape_single_quotes)
+        .map(|escaped_parent| format!("mkdir -p '{escaped_parent}' && "))
+        .unwrap_or_default();
+    let shell_cmd =
+        format!("{mkdir}cat > '{escaped_path}' <<'NETTUI_FILE'\n{contents}\nNETTUI_FILE");
+
+    let pkexec = Command::new("pkexec")
+        .arg("sh")
+        .arg("-c")
+        .arg(&shell_cmd)
+        .output()
+        .await;
+    if let Ok(out) = pkexec
+        && out.status.success()
+    {
+        return Ok(());
+    }
+
+    let sudo = Command::new("sudo")
+        .arg("-n")
+        .arg("sh")
+        .arg("-c")
+        .arg(&shell_cmd)
+        .output()
+        .await
+        .context(error_context.to_string())?;
+    if sudo.status.success() {
+        return Ok(());
+    }
+
+    let stderr = String::from_utf8_lossy(&sudo.stderr).trim().to_string();
+    Err(std::io::Error::other(if stderr.is_empty() {
+        error_context.to_string()
     } else {
         stderr
     })

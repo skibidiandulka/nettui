@@ -18,6 +18,7 @@ use crate::{
         common::{ActiveTab, StartupTabPolicy, Toast, ToastKind, WifiFocus},
         ethernet::{EthernetIface, EthernetState},
         wifi::{WifiNetwork, WifiState},
+        wifi_enterprise::{EnterpriseMethod, EnterprisePhase2Method, WifiEnterpriseProfile},
     },
     keybinds::Keybinds,
 };
@@ -75,6 +76,7 @@ pub struct App {
     pub hidden_connect_prompt: bool,
     pub hidden_ssid_input: String,
     pub wifi_auth_prompt: Option<WifiAuthPrompt>,
+    pub wifi_enterprise_prompt: Option<WifiEnterprisePrompt>,
     pub wifi_ap_prompt_open: bool,
     pub wifi_ap_ssid_input: String,
     pub wifi_ap_passphrase_input: String,
@@ -140,6 +142,30 @@ pub struct WifiAuthPrompt {
     pub primary_visible: bool,
     pub secondary_visible: bool,
     responder: Option<oneshot::Sender<AuthPromptResponse>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WifiEnterprisePromptField {
+    Method,
+    Identity,
+    ServerDomainMask,
+    CaCert,
+    ClientCert,
+    ClientKey,
+    KeyPassphrase,
+    Phase2Method,
+    Phase2Identity,
+    Phase2Password,
+    Password,
+}
+
+pub struct WifiEnterprisePrompt {
+    pub ssid: String,
+    pub profile: WifiEnterpriseProfile,
+    pub focus: WifiEnterprisePromptField,
+    pub key_passphrase_visible: bool,
+    pub phase2_password_visible: bool,
+    pub password_visible: bool,
 }
 
 impl WifiAuthPrompt {
@@ -258,6 +284,138 @@ impl WifiAuthPrompt {
     }
 }
 
+impl WifiEnterprisePrompt {
+    fn new(ssid: String) -> Self {
+        Self {
+            profile: WifiEnterpriseProfile::new_for_ssid(&ssid),
+            ssid,
+            focus: WifiEnterprisePromptField::Method,
+            key_passphrase_visible: false,
+            phase2_password_visible: false,
+            password_visible: false,
+        }
+    }
+
+    pub fn visible_fields(&self) -> Vec<WifiEnterprisePromptField> {
+        let mut fields = vec![WifiEnterprisePromptField::Method];
+        match self.profile.method {
+            EnterpriseMethod::Eduroam => {
+                fields.extend([
+                    WifiEnterprisePromptField::Identity,
+                    WifiEnterprisePromptField::Phase2Identity,
+                    WifiEnterprisePromptField::Phase2Password,
+                ]);
+            }
+            EnterpriseMethod::Peap | EnterpriseMethod::Ttls => {
+                fields.extend([
+                    WifiEnterprisePromptField::Identity,
+                    WifiEnterprisePromptField::ServerDomainMask,
+                    WifiEnterprisePromptField::CaCert,
+                    WifiEnterprisePromptField::ClientCert,
+                    WifiEnterprisePromptField::ClientKey,
+                    WifiEnterprisePromptField::KeyPassphrase,
+                    WifiEnterprisePromptField::Phase2Method,
+                    WifiEnterprisePromptField::Phase2Identity,
+                    WifiEnterprisePromptField::Phase2Password,
+                ]);
+            }
+            EnterpriseMethod::Tls => {
+                fields.extend([
+                    WifiEnterprisePromptField::CaCert,
+                    WifiEnterprisePromptField::Identity,
+                    WifiEnterprisePromptField::ClientCert,
+                    WifiEnterprisePromptField::ClientKey,
+                    WifiEnterprisePromptField::KeyPassphrase,
+                ]);
+            }
+            EnterpriseMethod::Pwd => {
+                fields.extend([
+                    WifiEnterprisePromptField::Identity,
+                    WifiEnterprisePromptField::Password,
+                ]);
+            }
+        }
+        fields
+    }
+
+    pub fn move_prev(&mut self) {
+        let fields = self.visible_fields();
+        let index = fields
+            .iter()
+            .position(|field| *field == self.focus)
+            .unwrap_or(0);
+        if index > 0 {
+            self.focus = fields[index - 1];
+        }
+    }
+
+    pub fn move_next(&mut self) {
+        let fields = self.visible_fields();
+        let index = fields
+            .iter()
+            .position(|field| *field == self.focus)
+            .unwrap_or(0);
+        if let Some(next) = fields.get(index + 1) {
+            self.focus = *next;
+        }
+    }
+
+    fn reset_focus_if_hidden(&mut self) {
+        if !self.visible_fields().contains(&self.focus) {
+            self.focus = WifiEnterprisePromptField::Method;
+        }
+    }
+
+    pub fn cycle_left(&mut self) {
+        match self.focus {
+            WifiEnterprisePromptField::Method => {
+                self.profile.method = self.profile.method.prev();
+                self.profile.phase2_method = EnterprisePhase2Method::Mschapv2;
+                self.reset_focus_if_hidden();
+            }
+            WifiEnterprisePromptField::Phase2Method => {
+                self.profile.phase2_method = self
+                    .profile
+                    .phase2_method
+                    .prev_for_method(self.profile.method);
+            }
+            _ => {}
+        }
+    }
+
+    pub fn cycle_right(&mut self) {
+        match self.focus {
+            WifiEnterprisePromptField::Method => {
+                self.profile.method = self.profile.method.next();
+                self.profile.phase2_method = EnterprisePhase2Method::Mschapv2;
+                self.reset_focus_if_hidden();
+            }
+            WifiEnterprisePromptField::Phase2Method => {
+                self.profile.phase2_method = self
+                    .profile
+                    .phase2_method
+                    .next_for_method(self.profile.method);
+            }
+            _ => {}
+        }
+    }
+
+    pub fn toggle_visibility(&mut self) {
+        match self.focus {
+            WifiEnterprisePromptField::KeyPassphrase => {
+                self.key_passphrase_visible = !self.key_passphrase_visible;
+            }
+            WifiEnterprisePromptField::Phase2Password => {
+                self.phase2_password_visible = !self.phase2_password_visible;
+            }
+            WifiEnterprisePromptField::Password => {
+                self.password_visible = !self.password_visible;
+            }
+            _ => {}
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WifiApPromptField {
     Ssid,
@@ -314,6 +472,7 @@ impl App {
             hidden_connect_prompt: false,
             hidden_ssid_input: String::new(),
             wifi_auth_prompt: None,
+            wifi_enterprise_prompt: None,
             wifi_ap_prompt_open: false,
             wifi_ap_ssid_input: String::new(),
             wifi_ap_passphrase_input: String::new(),
@@ -586,6 +745,14 @@ impl App {
             return Some(Toast {
                 kind: ToastKind::Info,
                 msg: "Set up Wi-Fi access point".to_string(),
+                until: None,
+            });
+        }
+
+        if let Some(prompt) = &self.wifi_enterprise_prompt {
+            return Some(Toast {
+                kind: ToastKind::Info,
+                msg: format!("Configure enterprise Wi-Fi for {}", prompt.ssid),
                 until: None,
             });
         }
