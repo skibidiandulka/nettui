@@ -2,6 +2,7 @@
   <h2>🖧 nettui</h2>
   <p>TUI for Wi-Fi and Ethernet</p>
 </div>
+
 ![nettui-showcase](https://github.com/user-attachments/assets/3603f7eb-433a-4641-bc38-700d93c67e9f)
 
 
