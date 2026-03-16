@@ -1161,6 +1161,41 @@ mod tests {
     }
 
     #[test]
+    fn startup_prefers_ipv6_only_ethernet_when_active() {
+        let wifi = WifiState {
+            ifaces: vec!["wlan0".to_string()],
+            station_iface: Some("wlan0".to_string()),
+            access_point_iface: None,
+            connected_ssid: Some("Home".to_string()),
+            access_point_ssid: None,
+            access_point_clients: vec![],
+            known_networks: vec![],
+            unavailable_known_networks: vec![],
+            new_networks: vec![],
+            hidden_networks: vec![],
+            device: None,
+        };
+        let ethernet = EthernetState {
+            ifaces: vec![EthernetIface {
+                name: "enp1s0".to_string(),
+                operstate: "up".to_string(),
+                carrier: Some(true),
+                mac: None,
+                speed_mbps: None,
+                ipv4: vec![],
+                ipv6: vec!["2001:db8::10/64".to_string()],
+                gateway_v4: None,
+                dns: vec![],
+            }],
+        };
+
+        assert_eq!(
+            determine_start_tab(StartupTabPolicy::PreferActive, &wifi, &ethernet),
+            ActiveTab::Ethernet
+        );
+    }
+
+    #[test]
     fn refresh_due_respects_interval() {
         let base = Instant::now();
         assert!(!refresh_due(base, 900, base + Duration::from_millis(300)));

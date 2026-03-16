@@ -74,6 +74,16 @@ fn render_details(app: &mut App, frame: &mut Frame, area: Rect) {
             }
         }
 
+        lines.push(Line::from(""));
+        lines.push(Line::from("IPv6:"));
+        if d.ipv6.is_empty() {
+            lines.push(Line::from("  -"));
+        } else {
+            for ip in &d.ipv6 {
+                lines.push(Line::from(format!("  {ip}")));
+            }
+        }
+
         if let Some(msg) = &app.last_action {
             lines.push(Line::from(""));
             lines.push(Line::from(vec![
@@ -114,7 +124,7 @@ fn render_ifaces(app: &mut App, frame: &mut Frame, area: Rect) {
                 Cell::from(d.operstate.clone()),
                 Cell::from(carrier),
                 Cell::from(speed),
-                Cell::from(d.ipv4.first().cloned().unwrap_or_else(|| "-".into())),
+                Cell::from(d.primary_ip().unwrap_or("-").to_string()),
             ])
         })
         .collect();
@@ -131,7 +141,7 @@ fn render_ifaces(app: &mut App, frame: &mut Frame, area: Rect) {
         ],
     )
     .header(
-        Row::new(vec!["", "Iface", "State", "Carrier", "Speed", "IPv4"])
+        Row::new(vec!["", "Iface", "State", "Carrier", "Speed", "IP"])
             .style(Style::default().fg(Color::Yellow).bold())
             .bottom_margin(1),
     )

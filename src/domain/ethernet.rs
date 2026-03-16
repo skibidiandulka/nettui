@@ -12,8 +12,19 @@ pub struct EthernetIface {
 }
 
 impl EthernetIface {
+    pub fn has_ip(&self) -> bool {
+        !self.ipv4.is_empty() || !self.ipv6.is_empty()
+    }
+
+    pub fn primary_ip(&self) -> Option<&str> {
+        self.ipv4
+            .first()
+            .map(String::as_str)
+            .or_else(|| self.ipv6.first().map(String::as_str))
+    }
+
     pub fn is_active(&self) -> bool {
-        self.carrier == Some(true) && !self.ipv4.is_empty()
+        self.carrier == Some(true) && self.has_ip()
     }
 }
 

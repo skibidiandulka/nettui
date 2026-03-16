@@ -165,6 +165,16 @@ fn render_details_popup(app: &App, frame: &mut Frame) {
         }
 
         lines.push(Line::from(""));
+        lines.push(Line::from(Span::from("IPv6").bold()));
+        if details.ipv6.is_empty() {
+            lines.push(Line::from("  -"));
+        } else {
+            for ip in &details.ipv6 {
+                lines.push(Line::from(format!("  {ip}")));
+            }
+        }
+
+        lines.push(Line::from(""));
         lines.push(Line::from(vec![
             Span::from("i").bold(),
             Span::from(" close details"),
