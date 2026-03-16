@@ -422,6 +422,10 @@ impl App {
             return Ok(());
         };
 
+        self.set_toast(
+            ToastKind::Info,
+            "Root access may be required to show saved Wi-Fi credentials",
+        );
         let WifiShareCredentials { ssid, passphrase } =
             self.wifi_backend.load_share_credentials(&net.ssid).await?;
         let qr_payload = format!("WIFI:T:WPA;S:{ssid};P:{passphrase};;");
@@ -496,6 +500,10 @@ impl App {
             .map(|i| i.name.clone())
             .ok_or_else(|| std::io::Error::other("no ethernet interface selected"))?;
 
+        self.set_toast(
+            ToastKind::Info,
+            format!("Root access may be required to renew DHCP on {iface}"),
+        );
         let before = snapshot_eth(self.selected_eth_iface());
         let out = self.eth_backend.renew_dhcp(&iface).await?;
         self.refresh_all().await;
@@ -530,6 +538,13 @@ impl App {
         let target_up = !(iface.operstate == "up" || iface.carrier == Some(true));
         let state_word = if target_up { "up" } else { "down" };
 
+        self.set_toast(
+            ToastKind::Info,
+            format!(
+                "Root access may be required to set {} {}",
+                iface.name, state_word
+            ),
+        );
         let out = self
             .eth_backend
             .set_link_admin_state(&iface.name, target_up)
