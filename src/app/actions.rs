@@ -63,28 +63,85 @@ impl App {
         self.hidden_ssid_input.pop();
     }
 
-    pub fn open_wifi_passphrase_prompt(&mut self, ssid: String) {
-        self.wifi_passphrase_prompt_ssid = Some(ssid);
-        self.wifi_passphrase_input.clear();
-        self.wifi_passphrase_visible = false;
+    pub fn open_manual_wifi_auth_prompt(&mut self, ssid: String) {
+        self.wifi_auth_prompt = Some(WifiAuthPrompt::manual_passphrase(ssid));
     }
 
-    pub fn close_wifi_passphrase_prompt(&mut self) {
-        self.wifi_passphrase_prompt_ssid = None;
-        self.wifi_passphrase_input.clear();
-        self.wifi_passphrase_visible = false;
+    pub fn open_wifi_auth_prompt_from_agent(&mut self, request: AuthPromptRequest) {
+        self.wifi_auth_prompt = Some(WifiAuthPrompt::from_agent_request(request));
     }
 
-    pub fn passphrase_input_push(&mut self, c: char) {
-        self.wifi_passphrase_input.push(c);
+    pub fn close_wifi_auth_prompt(&mut self) {
+        if let Some(prompt) = self.wifi_auth_prompt.take() {
+            prompt.cancel();
+        }
     }
 
-    pub fn passphrase_input_backspace(&mut self) {
-        self.wifi_passphrase_input.pop();
+    pub fn dismiss_wifi_auth_prompt(&mut self) {
+        self.wifi_auth_prompt = None;
     }
 
-    pub fn toggle_passphrase_visibility(&mut self) {
-        self.wifi_passphrase_visible = !self.wifi_passphrase_visible;
+    pub fn wifi_auth_input_push(&mut self, c: char) {
+        let Some(prompt) = self.wifi_auth_prompt.as_mut() else {
+            return;
+        };
+        match prompt.focus {
+            WifiAuthPromptField::Primary => prompt.primary_input.push(c),
+            WifiAuthPromptField::Secondary => {
+                if prompt.has_secondary_field() {
+                    prompt.secondary_input.push(c);
+                }
+            }
+        }
+    }
+
+    pub fn wifi_auth_input_backspace(&mut self) {
+        let Some(prompt) = self.wifi_auth_prompt.as_mut() else {
+            return;
+        };
+        match prompt.focus {
+            WifiAuthPromptField::Primary => {
+                prompt.primary_input.pop();
+            }
+            WifiAuthPromptField::Secondary => {
+                if prompt.has_secondary_field() {
+                    prompt.secondary_input.pop();
+                }
+            }
+        }
+    }
+
+    pub fn select_prev_wifi_auth_field(&mut self) {
+        if let Some(prompt) = self.wifi_auth_prompt.as_mut()
+            && prompt.has_secondary_field()
+        {
+            prompt.focus = WifiAuthPromptField::Primary;
+        }
+    }
+
+    pub fn select_next_wifi_auth_field(&mut self) {
+        if let Some(prompt) = self.wifi_auth_prompt.as_mut()
+            && prompt.has_secondary_field()
+        {
+            prompt.focus = WifiAuthPromptField::Secondary;
+        }
+    }
+
+    pub fn toggle_wifi_auth_visibility(&mut self) {
+        let Some(prompt) = self.wifi_auth_prompt.as_mut() else {
+            return;
+        };
+
+        if prompt.has_secondary_field() && prompt.focus == WifiAuthPromptField::Secondary {
+            prompt.secondary_visible = !prompt.secondary_visible;
+            return;
+        }
+
+        if prompt.primary_is_secret() {
+            prompt.primary_visible = !prompt.primary_visible;
+        } else if prompt.secondary_is_secret() {
+            prompt.secondary_visible = !prompt.secondary_visible;
+        }
     }
 
     pub fn open_wifi_ap_prompt(&mut self) {
@@ -177,36 +234,67 @@ impl App {
         }
     }
 
-    pub async fn submit_wifi_passphrase_connect(&mut self) {
-        let Some(ssid) = self.wifi_passphrase_prompt_ssid.clone() else {
+    pub async fn submit_wifi_auth_prompt(&mut self) {
+        let Some(mut prompt) = self.wifi_auth_prompt.take() else {
             return;
         };
-        let passphrase = self.wifi_passphrase_input.clone();
-        if passphrase.is_empty() {
-            self.set_toast(ToastKind::Error, "Passphrase cannot be empty");
+
+        if prompt.primary_input.is_empty() {
+            self.set_toast(
+                ToastKind::Error,
+                format!("{} cannot be empty", prompt.primary_label()),
+            );
+            self.wifi_auth_prompt = Some(prompt);
+            return;
+        }
+        if prompt.has_secondary_field() && prompt.secondary_input.is_empty() {
+            let label = prompt.secondary_label().unwrap_or("Password");
+            self.set_toast(ToastKind::Error, format!("{label} cannot be empty"));
+            self.wifi_auth_prompt = Some(prompt);
             return;
         }
 
-        if self.wifi_connect_pending {
-            self.set_toast(ToastKind::Info, "Wi-Fi connect already in progress");
-            return;
+        match prompt.kind {
+            WifiAuthPromptKind::ManualPassphrase => {
+                if self.wifi_connect_pending {
+                    self.set_toast(ToastKind::Info, "Wi-Fi connect already in progress");
+                    self.wifi_auth_prompt = Some(prompt);
+                    return;
+                }
+
+                let ssid = prompt.ssid.clone();
+                let passphrase = prompt.primary_input.clone();
+                self.last_action = Some(format!("Connecting to {ssid}..."));
+                self.wifi_connect_pending = true;
+                self.wifi_connect_started_at = Some(Instant::now());
+                self.wifi_connect_context = Some(WifiConnectContext {
+                    ssid: ssid.clone(),
+                    disconnect: false,
+                    used_passphrase: true,
+                });
+                self.wifi_connect_task = Some(tokio::spawn(async move {
+                    IwdBackend::new()
+                        .connect_with_passphrase(&ssid, &passphrase)
+                        .await
+                }));
+            }
+            WifiAuthPromptKind::AgentPassphrase
+            | WifiAuthPromptKind::AgentPrivateKeyPassphrase
+            | WifiAuthPromptKind::AgentUserPassword { .. } => {
+                if let Some(responder) = prompt.take_responder() {
+                    let _ =
+                        responder.send(AuthPromptResponse::Secret(prompt.primary_input.clone()));
+                }
+            }
+            WifiAuthPromptKind::AgentUserNameAndPassphrase => {
+                if let Some(responder) = prompt.take_responder() {
+                    let _ = responder.send(AuthPromptResponse::UserNameAndPassphrase {
+                        user_name: prompt.primary_input.clone(),
+                        passphrase: prompt.secondary_input.clone(),
+                    });
+                }
+            }
         }
-
-        self.last_action = Some(format!("Connecting to {ssid}..."));
-        self.close_wifi_passphrase_prompt();
-
-        self.wifi_connect_pending = true;
-        self.wifi_connect_started_at = Some(Instant::now());
-        self.wifi_connect_context = Some(WifiConnectContext {
-            ssid: ssid.clone(),
-            disconnect: false,
-            used_passphrase: true,
-        });
-        self.wifi_connect_task = Some(tokio::spawn(async move {
-            IwdBackend::new()
-                .connect_with_passphrase(&ssid, &passphrase)
-                .await
-        }));
     }
 
     pub async fn wifi_toggle_access_point_mode(&mut self) -> Result<()> {

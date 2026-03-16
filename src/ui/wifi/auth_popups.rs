@@ -1,5 +1,5 @@
 use super::popup_layout::centered_rect;
-use crate::app::{App, WifiApPromptField};
+use crate::app::{App, WifiApPromptField, WifiAuthPromptField};
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout},
@@ -12,8 +12,8 @@ pub(super) fn render_auth_popups(app: &App, frame: &mut Frame) {
     if app.wifi_ap_prompt_open {
         render_wifi_ap_popup(app, frame);
     }
-    if app.wifi_passphrase_prompt_ssid.is_some() {
-        render_wifi_passphrase_popup(app, frame);
+    if app.wifi_auth_prompt.is_some() {
+        render_wifi_auth_popup(app, frame);
     }
     if app.hidden_connect_prompt {
         render_hidden_connect_popup(app, frame);
@@ -51,105 +51,219 @@ fn render_hidden_connect_popup(app: &App, frame: &mut Frame) {
     frame.render_widget(Paragraph::new(content), inner);
 }
 
-fn render_wifi_passphrase_popup(app: &App, frame: &mut Frame) {
-    let Some(ssid) = app.wifi_passphrase_prompt_ssid.clone() else {
+fn render_wifi_auth_popup(app: &App, frame: &mut Frame) {
+    let Some(prompt) = app.wifi_auth_prompt.as_ref() else {
         return;
     };
 
-    let area = centered_rect(62, 38, frame.area());
+    let has_secondary_field = prompt.has_secondary_field();
+    let has_fixed_user_name = prompt.fixed_user_name().is_some();
+    let area_height = if has_secondary_field || has_fixed_user_name {
+        50
+    } else {
+        38
+    };
+
+    let area = centered_rect(62, area_height, frame.area());
     frame.render_widget(Clear, area);
 
     let block = Block::default()
-        .title(" Wi-Fi Passphrase ")
+        .title(prompt.title())
         .borders(Borders::ALL)
         .border_type(BorderType::Thick)
         .border_style(Style::default().fg(Color::Blue));
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    let passphrase = if app.wifi_passphrase_visible {
-        app.wifi_passphrase_input.clone()
+    let primary_value = if prompt.primary_is_secret() && !prompt.primary_visible {
+        "*".repeat(prompt.primary_input.chars().count())
     } else {
-        "*".repeat(app.wifi_passphrase_input.chars().count())
+        prompt.primary_input.clone()
+    };
+    let secondary_value = if prompt.secondary_is_secret() && !prompt.secondary_visible {
+        "*".repeat(prompt.secondary_input.chars().count())
+    } else {
+        prompt.secondary_input.clone()
     };
     let outer = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Fill(1),
-            Constraint::Length(8),
+            Constraint::Length(if has_secondary_field || has_fixed_user_name {
+                12
+            } else {
+                8
+            }),
             Constraint::Fill(1),
         ])
         .split(inner);
     let content_area = outer[1];
-    let chunks = Layout::default()
+    let rows = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(1),
-            Constraint::Length(1),
-            Constraint::Length(3),
-            Constraint::Length(1),
-        ])
+        .constraints(auth_popup_constraints(
+            has_secondary_field,
+            has_fixed_user_name,
+        ))
         .split(content_area);
-    let label_area = Layout::default()
+    let ssid_area = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
             Constraint::Fill(1),
             Constraint::Length(42),
             Constraint::Fill(1),
         ])
-        .split(chunks[0])[1];
-    let field_area = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Fill(1),
-            Constraint::Length(42),
-            Constraint::Fill(1),
-        ])
-        .split(chunks[2])[1];
-
-    let content = vec![Line::from(vec![
-        Span::from("SSID: ").bold(),
-        Span::from(ssid).fg(Color::Cyan),
-    ])];
-    frame.render_widget(Paragraph::new(content), label_area);
-
+        .split(rows[0])[1];
     frame.render_widget(
-        Paragraph::new(Line::from("Passphrase:").style(Style::default().bold())),
-        Layout::default()
+        Paragraph::new(Line::from(vec![
+            Span::from("SSID: ").bold(),
+            Span::from(prompt.ssid.as_str()).fg(Color::Cyan),
+        ])),
+        ssid_area,
+    );
+
+    let mut row_index = 1;
+    if let Some(user_name) = prompt.fixed_user_name() {
+        let user_name_area = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
                 Constraint::Fill(1),
                 Constraint::Length(42),
                 Constraint::Fill(1),
             ])
-            .split(chunks[1])[1],
-    );
+            .split(rows[row_index])[1];
+        frame.render_widget(
+            Paragraph::new(Line::from(vec![
+                Span::from("Username: ").bold(),
+                Span::from(user_name).fg(Color::Cyan),
+            ])),
+            user_name_area,
+        );
+        row_index += 1;
+    }
 
-    let field_block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Cyan))
-        .border_type(BorderType::Rounded);
-    let field_inner = field_block.inner(field_area);
-    frame.render_widget(field_block, field_area);
+    let primary_label_area = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Fill(1),
+            Constraint::Length(42),
+            Constraint::Fill(1),
+        ])
+        .split(rows[row_index])[1];
     frame.render_widget(
-        Paragraph::new(Line::from(Span::from(passphrase))).alignment(Alignment::Center),
-        field_inner,
+        Paragraph::new(Line::from(prompt.primary_label()).style(Style::default().bold())),
+        primary_label_area,
     );
+    row_index += 1;
+
+    let primary_field_area = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Fill(1),
+            Constraint::Length(42),
+            Constraint::Fill(1),
+        ])
+        .split(rows[row_index])[1];
+    let primary_block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(
+            Style::default().fg(if prompt.focus == WifiAuthPromptField::Primary {
+                Color::Cyan
+            } else {
+                Color::Gray
+            }),
+        )
+        .border_type(BorderType::Rounded);
+    let primary_inner = primary_block.inner(primary_field_area);
+    frame.render_widget(primary_block, primary_field_area);
+    frame.render_widget(
+        Paragraph::new(Line::from(Span::from(primary_value))).alignment(Alignment::Center),
+        primary_inner,
+    );
+    row_index += 1;
+
+    if let Some(secondary_label) = prompt.secondary_label() {
+        let secondary_label_area = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Fill(1),
+                Constraint::Length(42),
+                Constraint::Fill(1),
+            ])
+            .split(rows[row_index])[1];
+        frame.render_widget(
+            Paragraph::new(Line::from(secondary_label).style(Style::default().bold())),
+            secondary_label_area,
+        );
+        row_index += 1;
+
+        let secondary_field_area = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Fill(1),
+                Constraint::Length(42),
+                Constraint::Fill(1),
+            ])
+            .split(rows[row_index])[1];
+        let secondary_block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(
+                Style::default().fg(if prompt.focus == WifiAuthPromptField::Secondary {
+                    Color::Cyan
+                } else {
+                    Color::Gray
+                }),
+            )
+            .border_type(BorderType::Rounded);
+        let secondary_inner = secondary_block.inner(secondary_field_area);
+        frame.render_widget(secondary_block, secondary_field_area);
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::from(secondary_value))).alignment(Alignment::Center),
+            secondary_inner,
+        );
+        row_index += 1;
+    }
 
     frame.render_widget(
         Paragraph::new(Line::from(vec![
+            Span::from(if has_secondary_field {
+                "↑/↓"
+            } else {
+                "⇥"
+            })
+            .bold(),
+            Span::from(if has_secondary_field {
+                " field"
+            } else {
+                " show/hide"
+            }),
+            Span::from(" | "),
             Span::from("⇥").bold(),
             Span::from(" show/hide"),
             Span::from(" | "),
             Span::from("↵").bold(),
-            Span::from(" connect"),
+            Span::from(" submit"),
             Span::from(" | "),
             Span::from("Esc").bold(),
             Span::from(" cancel"),
         ]))
         .alignment(Alignment::Center),
-        chunks[3],
+        rows[row_index],
     );
+}
+
+fn auth_popup_constraints(has_secondary_field: bool, has_fixed_user_name: bool) -> Vec<Constraint> {
+    let mut constraints = vec![Constraint::Length(1)];
+    if has_fixed_user_name {
+        constraints.push(Constraint::Length(1));
+    }
+    constraints.push(Constraint::Length(1));
+    constraints.push(Constraint::Length(3));
+    if has_secondary_field {
+        constraints.push(Constraint::Length(1));
+        constraints.push(Constraint::Length(3));
+    }
+    constraints.push(Constraint::Length(1));
+    constraints
 }
 
 fn render_wifi_ap_popup(app: &App, frame: &mut Frame) {

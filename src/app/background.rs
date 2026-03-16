@@ -1,6 +1,43 @@
 use super::*;
 
 impl App {
+    pub fn poll_auth_agent_events(&mut self) {
+        loop {
+            let event = {
+                let Some(receiver) = self.wifi_auth_events.as_mut() else {
+                    return;
+                };
+                receiver.try_recv().ok()
+            };
+
+            let Some(event) = event else {
+                break;
+            };
+
+            match event {
+                AuthAgentEvent::Prompt(request) => {
+                    let ssid = request.ssid.clone();
+                    self.open_wifi_auth_prompt_from_agent(request);
+                    self.set_toast(ToastKind::Info, format!("Credentials required for {ssid}"));
+                }
+                AuthAgentEvent::Cancel { reason } => {
+                    self.dismiss_wifi_auth_prompt();
+                    self.set_toast(
+                        ToastKind::Info,
+                        format!("Wi-Fi authentication canceled ({reason})"),
+                    );
+                }
+                AuthAgentEvent::Released => {
+                    self.dismiss_wifi_auth_prompt();
+                    self.set_toast(
+                        ToastKind::Error,
+                        "iwd authentication agent was released. Retry the connection.",
+                    );
+                }
+            }
+        }
+    }
+
     pub async fn poll_background_tasks(&mut self) {
         let now = Instant::now();
         if self.wifi_scan_pending
@@ -101,16 +138,20 @@ impl App {
                     }
                     Ok(Err(e)) => {
                         let no_agent = is_no_agent_error(&e);
+                        let canceled = is_agent_canceled_error(&e);
                         if let Some(ctx) = ctx
                             && no_agent
                             && !ctx.disconnect
                             && !ctx.used_passphrase
                         {
-                            self.open_wifi_passphrase_prompt(ctx.ssid.clone());
+                            self.open_manual_wifi_auth_prompt(ctx.ssid.clone());
                             self.set_toast(
                                 ToastKind::Info,
                                 format!("Passphrase required for {}", ctx.ssid),
                             );
+                        } else if canceled {
+                            self.dismiss_wifi_auth_prompt();
+                            self.set_toast(ToastKind::Info, "Wi-Fi authentication canceled");
                         } else {
                             let msg = friendly_wifi_error("connect/disconnect", &e);
                             self.set_toast(ToastKind::Error, msg);

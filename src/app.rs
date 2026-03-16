@@ -7,7 +7,10 @@ mod state;
 
 use crate::{
     backend::{
-        iwd::{IwdBackend, WifiShareCredentials},
+        iwd::{
+            AuthAgentEvent, AuthPromptRequest, AuthPromptRequestKind, AuthPromptResponse,
+            IwdBackend, WifiShareCredentials,
+        },
         networkd::NetworkdBackend,
         traits::EthernetBackend,
     },
@@ -19,12 +22,14 @@ use crate::{
     keybinds::Keybinds,
 };
 use anyhow::Result;
+use iwdrs::agent::AgentManager;
 use ratatui::widgets::TableState;
 use std::{
     collections::VecDeque,
     time::{Duration, Instant},
 };
 use tokio::process::Command;
+use tokio::sync::{mpsc::UnboundedReceiver, oneshot};
 use tokio::task::JoinHandle;
 
 #[derive(Debug, Clone, Copy)]
@@ -69,9 +74,7 @@ pub struct App {
     pub show_hidden_networks: bool,
     pub hidden_connect_prompt: bool,
     pub hidden_ssid_input: String,
-    pub wifi_passphrase_prompt_ssid: Option<String>,
-    pub wifi_passphrase_input: String,
-    pub wifi_passphrase_visible: bool,
+    pub wifi_auth_prompt: Option<WifiAuthPrompt>,
     pub wifi_ap_prompt_open: bool,
     pub wifi_ap_ssid_input: String,
     pub wifi_ap_passphrase_input: String,
@@ -97,6 +100,8 @@ pub struct App {
 
     wifi_backend: IwdBackend,
     eth_backend: NetworkdBackend,
+    wifi_auth_agent: Option<AgentManager>,
+    wifi_auth_events: Option<UnboundedReceiver<AuthAgentEvent>>,
     wifi_scan_task: Option<JoinHandle<Result<()>>>,
     wifi_connect_task: Option<JoinHandle<Result<()>>>,
     wifi_ap_task: Option<JoinHandle<Result<()>>>,
@@ -109,6 +114,148 @@ struct WifiConnectContext {
     ssid: String,
     disconnect: bool,
     used_passphrase: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WifiAuthPromptField {
+    Primary,
+    Secondary,
+}
+
+#[derive(Debug, Clone)]
+pub enum WifiAuthPromptKind {
+    ManualPassphrase,
+    AgentPassphrase,
+    AgentPrivateKeyPassphrase,
+    AgentUserPassword { user_name: Option<String> },
+    AgentUserNameAndPassphrase,
+}
+
+pub struct WifiAuthPrompt {
+    pub ssid: String,
+    pub kind: WifiAuthPromptKind,
+    pub primary_input: String,
+    pub secondary_input: String,
+    pub focus: WifiAuthPromptField,
+    pub primary_visible: bool,
+    pub secondary_visible: bool,
+    responder: Option<oneshot::Sender<AuthPromptResponse>>,
+}
+
+impl WifiAuthPrompt {
+    fn manual_passphrase(ssid: String) -> Self {
+        Self {
+            ssid,
+            kind: WifiAuthPromptKind::ManualPassphrase,
+            primary_input: String::new(),
+            secondary_input: String::new(),
+            focus: WifiAuthPromptField::Primary,
+            primary_visible: false,
+            secondary_visible: false,
+            responder: None,
+        }
+    }
+
+    fn from_agent_request(request: AuthPromptRequest) -> Self {
+        let (ssid, kind, responder) = request.into_parts();
+        let kind = match kind {
+            AuthPromptRequestKind::Passphrase => WifiAuthPromptKind::AgentPassphrase,
+            AuthPromptRequestKind::PrivateKeyPassphrase => {
+                WifiAuthPromptKind::AgentPrivateKeyPassphrase
+            }
+            AuthPromptRequestKind::UserPassword { user_name } => {
+                WifiAuthPromptKind::AgentUserPassword { user_name }
+            }
+            AuthPromptRequestKind::UserNameAndPassphrase => {
+                WifiAuthPromptKind::AgentUserNameAndPassphrase
+            }
+        };
+
+        Self {
+            ssid,
+            kind,
+            primary_input: String::new(),
+            secondary_input: String::new(),
+            focus: WifiAuthPromptField::Primary,
+            primary_visible: false,
+            secondary_visible: false,
+            responder: Some(responder),
+        }
+    }
+
+    pub fn title(&self) -> &'static str {
+        match self.kind {
+            WifiAuthPromptKind::ManualPassphrase | WifiAuthPromptKind::AgentPassphrase => {
+                " Wi-Fi Passphrase "
+            }
+            WifiAuthPromptKind::AgentPrivateKeyPassphrase => " Private Key Passphrase ",
+            WifiAuthPromptKind::AgentUserPassword { .. } => " Wi-Fi Password ",
+            WifiAuthPromptKind::AgentUserNameAndPassphrase => " Wi-Fi Credentials ",
+        }
+    }
+
+    pub fn primary_label(&self) -> &'static str {
+        match self.kind {
+            WifiAuthPromptKind::ManualPassphrase | WifiAuthPromptKind::AgentPassphrase => {
+                "Passphrase"
+            }
+            WifiAuthPromptKind::AgentPrivateKeyPassphrase => "Key passphrase",
+            WifiAuthPromptKind::AgentUserPassword { .. } => "Password",
+            WifiAuthPromptKind::AgentUserNameAndPassphrase => "Username",
+        }
+    }
+
+    pub fn secondary_label(&self) -> Option<&'static str> {
+        match self.kind {
+            WifiAuthPromptKind::AgentUserNameAndPassphrase => Some("Password"),
+            _ => None,
+        }
+    }
+
+    pub fn primary_is_secret(&self) -> bool {
+        !matches!(self.kind, WifiAuthPromptKind::AgentUserNameAndPassphrase)
+    }
+
+    pub fn secondary_is_secret(&self) -> bool {
+        self.secondary_label().is_some()
+    }
+
+    pub fn fixed_user_name(&self) -> Option<&str> {
+        match &self.kind {
+            WifiAuthPromptKind::AgentUserPassword {
+                user_name: Some(user_name),
+            } => Some(user_name.as_str()),
+            _ => None,
+        }
+    }
+
+    pub fn has_secondary_field(&self) -> bool {
+        self.secondary_label().is_some()
+    }
+
+    pub fn status_message(&self) -> String {
+        match self.kind {
+            WifiAuthPromptKind::ManualPassphrase
+            | WifiAuthPromptKind::AgentPassphrase
+            | WifiAuthPromptKind::AgentPrivateKeyPassphrase => {
+                format!("Credentials required for {}", self.ssid)
+            }
+            WifiAuthPromptKind::AgentUserPassword { .. }
+            | WifiAuthPromptKind::AgentUserNameAndPassphrase => {
+                format!("Enterprise authentication required for {}", self.ssid)
+            }
+        }
+    }
+
+    fn cancel(mut self) {
+        if let Some(responder) = self.responder.take() {
+            let _ = responder.send(AuthPromptResponse::Cancel);
+        }
+    }
+
+    fn take_responder(&mut self) -> Option<oneshot::Sender<AuthPromptResponse>> {
+        self.responder.take()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -166,9 +313,7 @@ impl App {
             show_hidden_networks: false,
             hidden_connect_prompt: false,
             hidden_ssid_input: String::new(),
-            wifi_passphrase_prompt_ssid: None,
-            wifi_passphrase_input: String::new(),
-            wifi_passphrase_visible: false,
+            wifi_auth_prompt: None,
             wifi_ap_prompt_open: false,
             wifi_ap_ssid_input: String::new(),
             wifi_ap_passphrase_input: String::new(),
@@ -191,6 +336,8 @@ impl App {
             last_scan_request_at: None,
             wifi_backend,
             eth_backend,
+            wifi_auth_agent: None,
+            wifi_auth_events: None,
             wifi_scan_task: None,
             wifi_connect_task: None,
             wifi_ap_task: None,
@@ -206,6 +353,10 @@ impl App {
                 friendly_wifi_error("load Wi-Fi state", &err),
             );
         }
+        if let Ok((agent_manager, auth_events)) = app.wifi_backend.register_auth_agent().await {
+            app.wifi_auth_agent = Some(agent_manager);
+            app.wifi_auth_events = Some(auth_events);
+        }
         if let Some(msg) = detect_conflicting_wifi_services().await {
             app.last_action = Some(msg.clone());
             app.set_toast(ToastKind::Info, msg);
@@ -214,6 +365,7 @@ impl App {
     }
 
     pub async fn tick(&mut self) -> Result<()> {
+        self.poll_auth_agent_events();
         self.poll_background_tasks().await;
         let now = Instant::now();
 
@@ -438,10 +590,10 @@ impl App {
             });
         }
 
-        if let Some(ssid) = &self.wifi_passphrase_prompt_ssid {
+        if let Some(prompt) = &self.wifi_auth_prompt {
             return Some(Toast {
                 kind: ToastKind::Info,
-                msg: format!("Passphrase required for {ssid}"),
+                msg: prompt.status_message(),
                 until: None,
             });
         }
@@ -691,6 +843,15 @@ fn is_no_agent_error(err: &anyhow::Error) -> bool {
     err.to_string()
         .to_lowercase()
         .contains("no agent registered")
+}
+
+fn is_agent_canceled_error(err: &anyhow::Error) -> bool {
+    let lower = err.to_string().to_lowercase();
+    lower.contains("user canceled")
+        || lower.contains("user-canceled")
+        || lower.contains("operation canceled")
+        || lower.contains("cancelled")
+        || lower == "canceled"
 }
 
 fn shorten_banner_message(msg: &str) -> String {

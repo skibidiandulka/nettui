@@ -30,14 +30,16 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> Result<()>
         return Ok(());
     }
 
-    if app.wifi_passphrase_prompt_ssid.is_some() {
+    if app.wifi_auth_prompt.is_some() {
         match key_event.code {
-            KeyCode::Esc => app.close_wifi_passphrase_prompt(),
-            KeyCode::Tab | KeyCode::BackTab => app.toggle_passphrase_visibility(),
-            KeyCode::Enter => app.submit_wifi_passphrase_connect().await,
-            KeyCode::Backspace => app.passphrase_input_backspace(),
+            KeyCode::Esc => app.close_wifi_auth_prompt(),
+            KeyCode::Tab | KeyCode::BackTab => app.toggle_wifi_auth_visibility(),
+            KeyCode::Enter => app.submit_wifi_auth_prompt().await,
+            KeyCode::Up => app.select_prev_wifi_auth_field(),
+            KeyCode::Down => app.select_next_wifi_auth_field(),
+            KeyCode::Backspace => app.wifi_auth_input_backspace(),
             KeyCode::Char(c) if !key_event.modifiers.contains(KeyModifiers::CONTROL) => {
-                app.passphrase_input_push(c)
+                app.wifi_auth_input_push(c)
             }
             _ => {}
         }
