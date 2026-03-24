@@ -27,6 +27,7 @@ use iwdrs::agent::AgentManager;
 use ratatui::widgets::TableState;
 use std::{
     collections::VecDeque,
+    env,
     time::{Duration, Instant},
 };
 use tokio::process::Command;
@@ -86,6 +87,7 @@ pub struct App {
 
     pub ethernet: EthernetState,
     pub ethernet_state: TableState,
+    pub ethernet_backend_issue: Option<String>,
 
     pub last_error: Option<String>,
     pub last_action: Option<String>,
@@ -481,6 +483,7 @@ impl App {
             wifi_share_popup: None,
             ethernet,
             ethernet_state: TableState::default(),
+            ethernet_backend_issue: None,
             last_error: None,
             last_action: None,
             toasts: VecDeque::new(),
@@ -512,11 +515,18 @@ impl App {
                 friendly_wifi_error("load Wi-Fi state", &err),
             );
         }
+        app.ethernet_backend_issue = detect_ethernet_backend_issue(&app.ethernet).await;
         if let Ok((agent_manager, auth_events)) = app.wifi_backend.register_auth_agent().await {
             app.wifi_auth_agent = Some(agent_manager);
             app.wifi_auth_events = Some(auth_events);
         }
         if let Some(msg) = detect_conflicting_wifi_services().await {
+            app.last_action = Some(msg.clone());
+            app.set_toast(ToastKind::Info, msg);
+        }
+        if app.active_tab == ActiveTab::Ethernet
+            && let Some(msg) = app.ethernet_backend_issue.clone()
+        {
             app.last_action = Some(msg.clone());
             app.set_toast(ToastKind::Info, msg);
         }
@@ -573,8 +583,10 @@ impl App {
             Ok(ifaces) => {
                 self.ethernet = EthernetState { ifaces };
                 self.restore_ethernet_selection(selected_eth);
+                self.ethernet_backend_issue = detect_ethernet_backend_issue(&self.ethernet).await;
             }
             Err(err) => {
+                self.ethernet_backend_issue = None;
                 self.push_toast(ToastKind::Error, shorten_banner_message(&err.to_string()));
             }
         }
@@ -850,6 +862,10 @@ impl App {
         })
     }
 
+    pub fn wifi_ap_needs_network_configuration(&self) -> bool {
+        self.wifi_access_point_active() && !self.wifi_backend.network_configuration_enabled()
+    }
+
     fn push_toast(&mut self, kind: ToastKind, msg: impl Into<String>) {
         let msg = msg.into();
         if self.toasts.iter().any(|toast| {
@@ -914,6 +930,14 @@ async fn detect_conflicting_wifi_services() -> Option<String> {
     }
 }
 
+async fn detect_ethernet_backend_issue(ethernet: &EthernetState) -> Option<String> {
+    ethernet_backend_issue_message(
+        ethernet.has_adapter(),
+        command_in_path("networkctl"),
+        is_service_active("systemd-networkd.service").await,
+    )
+}
+
 async fn is_service_active(unit: &str) -> bool {
     match Command::new("systemctl")
         .arg("is-active")
@@ -925,6 +949,40 @@ async fn is_service_active(unit: &str) -> bool {
         Ok(status) => status.success(),
         Err(_) => false,
     }
+}
+
+fn command_in_path(cmd: &str) -> bool {
+    let Some(path) = env::var_os("PATH") else {
+        return false;
+    };
+
+    env::split_paths(&path).any(|dir| {
+        let candidate = dir.join(cmd);
+        candidate.is_file()
+    })
+}
+
+fn ethernet_backend_issue_message(
+    has_adapter: bool,
+    has_networkctl: bool,
+    networkd_active: bool,
+) -> Option<String> {
+    if !has_adapter {
+        return None;
+    }
+    if !has_networkctl {
+        return Some(
+            "networkctl was not found. Ethernet renew and details work best with systemd-networkd tools installed."
+                .to_string(),
+        );
+    }
+    if !networkd_active {
+        return Some(
+            "systemd-networkd is not active. Ethernet renew and state reporting may be limited until it is enabled."
+                .to_string(),
+        );
+    }
+    None
 }
 
 fn refresh_due(last_refresh: Instant, interval_ms: u64, now: Instant) -> bool {
@@ -952,6 +1010,14 @@ fn scan_debounce_remaining(
 fn friendly_wifi_error(action: &str, err: &anyhow::Error) -> String {
     let msg = err.to_string();
     let lower = msg.to_lowercase();
+    if (lower.contains("8021x") || lower.contains("enterprise") || lower.contains("eap"))
+        && (lower.contains("identity")
+            || lower.contains("password")
+            || lower.contains("phase2")
+            || lower.contains("authentication failed"))
+    {
+        return "Enterprise Wi-Fi credentials were rejected. Check the EAP method, identity, and password.".to_string();
+    }
     if lower.contains("argument format is invalid")
         || lower.contains("invalid passphrase")
         || lower.contains("invalid psk")
@@ -992,6 +1058,14 @@ fn friendly_wifi_error(action: &str, err: &anyhow::Error) -> String {
             "{} needs Wi-Fi credentials. Use connect again and enter passphrase.",
             action
         );
+    }
+    if (lower.contains("certificate") || lower.contains("client key") || lower.contains("ca cert"))
+        && (lower.contains("verify")
+            || lower.contains("failed")
+            || lower.contains("not found")
+            || lower.contains("absolute path"))
+    {
+        return "Enterprise Wi-Fi needs valid certificate paths and files.".to_string();
     }
     if lower.contains("accessdenied")
         || lower.contains("permission denied")
@@ -1223,6 +1297,49 @@ mod tests {
         assert_eq!(
             friendly_wifi_error("connect/disconnect", &err),
             "Couldn't connect. Check the password and try again."
+        );
+    }
+
+    #[test]
+    fn friendly_wifi_error_simplifies_enterprise_certificate_failures() {
+        let err = anyhow::anyhow!("CA certificate file was not found");
+        assert_eq!(
+            friendly_wifi_error("write enterprise profile", &err),
+            "Enterprise Wi-Fi needs valid certificate paths and files."
+        );
+    }
+
+    #[test]
+    fn friendly_wifi_error_simplifies_enterprise_auth_failures() {
+        let err = anyhow::anyhow!("8021x phase2 authentication failed");
+        assert_eq!(
+            friendly_wifi_error("connect/disconnect", &err),
+            "Enterprise Wi-Fi credentials were rejected. Check the EAP method, identity, and password."
+        );
+    }
+
+    #[test]
+    fn ethernet_backend_warning_is_silent_without_adapter() {
+        assert!(ethernet_backend_issue_message(false, false, false).is_none());
+    }
+
+    #[test]
+    fn ethernet_backend_warning_detects_missing_networkctl() {
+        assert_eq!(
+            ethernet_backend_issue_message(true, false, true).as_deref(),
+            Some(
+                "networkctl was not found. Ethernet renew and details work best with systemd-networkd tools installed."
+            )
+        );
+    }
+
+    #[test]
+    fn ethernet_backend_warning_detects_inactive_networkd() {
+        assert_eq!(
+            ethernet_backend_issue_message(true, true, false).as_deref(),
+            Some(
+                "systemd-networkd is not active. Ethernet renew and state reporting may be limited until it is enabled."
+            )
         );
     }
 

@@ -84,6 +84,14 @@ fn render_details(app: &mut App, frame: &mut Frame, area: Rect) {
             }
         }
 
+        if let Some(msg) = &app.ethernet_backend_issue {
+            lines.push(Line::from(""));
+            lines.push(Line::from(vec![
+                Span::from("Backend warning: ").bold(),
+                Span::from(msg.clone()).fg(Color::Yellow),
+            ]));
+        }
+
         if let Some(msg) = &app.last_action {
             lines.push(Line::from(""));
             lines.push(Line::from(vec![
@@ -94,11 +102,19 @@ fn render_details(app: &mut App, frame: &mut Frame, area: Rect) {
 
         Text::from(lines)
     } else {
-        Text::from(vec![
+        let mut lines = vec![
             Line::from("No Ethernet adapter found."),
             Line::from(""),
             Line::from("This panel lists physical non-wifi interfaces."),
-        ])
+        ];
+        if let Some(msg) = &app.ethernet_backend_issue {
+            lines.push(Line::from(""));
+            lines.push(Line::from(vec![
+                Span::from("Backend warning: ").bold(),
+                Span::from(msg.clone()).fg(Color::Yellow),
+            ]));
+        }
+        Text::from(lines)
     };
 
     let p = Paragraph::new(text).wrap(ratatui::widgets::Wrap { trim: true });

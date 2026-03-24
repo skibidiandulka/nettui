@@ -254,6 +254,12 @@ fn render_access_point_clients(app: &mut App, frame: &mut Frame, area: Rect) {
         rows.push(Row::new(vec![
             Cell::from("- no connected devices -").style(secondary_text_style()),
         ]));
+        if app.wifi_ap_needs_network_configuration() {
+            rows.push(Row::new(vec![
+                Cell::from("Enable iwd network configuration for DHCP support.")
+                    .style(secondary_text_style()),
+            ]));
+        }
     }
 
     let table = Table::new(rows, [Constraint::Min(20)])
