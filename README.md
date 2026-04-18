@@ -1,6 +1,7 @@
 <div align="center">
   <h2>🖧 nettui</h2>
   <p>TUI for Wi-Fi and Ethernet</p>
+  <p><img alt="CI" src="https://github.com/skibidiandulka/nettui/actions/workflows/rust.yml/badge.svg" /></p>
 </div>
 
 ![nettui-showcase](https://github.com/user-attachments/assets/3603f7eb-433a-4641-bc38-700d93c67e9f)
@@ -60,6 +61,10 @@ yay -S nettui
 ```bash
 yay -S nettui-bin
 ```
+
+## 🤝 Contributing
+
+See `CONTRIBUTING.md` for development setup, required checks, and pull request expectations.
 
 ## 🪄 Usage
 

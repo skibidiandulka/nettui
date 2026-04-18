@@ -1,0 +1,59 @@
+name: Bug report
+description: Report a reproducible problem in nettui.
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please include enough detail to reproduce the problem.
+  - type: input
+    id: version
+    attributes:
+      label: nettui version
+      placeholder: 0.4.2
+    validations:
+      required: true
+  - type: input
+    id: distro
+    attributes:
+      label: Linux distribution
+      placeholder: Omarchy / Arch Linux / other
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Network stack
+      description: Include anything relevant such as iwd, systemd-networkd, networkctl, adapter model, or conflicting managers.
+      placeholder: iwd 3.x, systemd-networkd enabled, Realtek USB adapter, no NetworkManager
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open nettui
+        2. Go to Wi-Fi > New Networks
+        3. Press Enter on ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Paste terminal output, journal lines, or screenshots if they help.
