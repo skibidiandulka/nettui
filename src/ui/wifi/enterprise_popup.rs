@@ -81,7 +81,7 @@ pub(super) fn render_enterprise_popup(app: &App, frame: &mut Frame) {
             Span::from("←/→").bold(),
             Span::from(" option"),
             Span::from(" | "),
-            Span::from("⇥").bold(),
+            Span::from("[Tab]").bold(),
             Span::from(" show/hide"),
             Span::from(" | "),
             Span::from("↵").bold(),

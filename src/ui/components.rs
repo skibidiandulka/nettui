@@ -70,7 +70,7 @@ pub fn render_footer(app: &App, frame: &mut Frame, area: Rect) {
     if app.active_tab == ActiveTab::Wifi {
         line1.extend([
             Span::from(" | "),
-            Span::from("⇥").bold(),
+            Span::from("[Tab]").bold(),
             Span::from(" section"),
         ]);
     }

@@ -228,7 +228,7 @@ fn render_wifi_auth_popup(app: &App, frame: &mut Frame) {
             Span::from(if has_secondary_field {
                 "↑/↓"
             } else {
-                "⇥"
+                "[Tab]"
             })
             .bold(),
             Span::from(if has_secondary_field {
@@ -237,7 +237,7 @@ fn render_wifi_auth_popup(app: &App, frame: &mut Frame) {
                 " show/hide"
             }),
             Span::from(" | "),
-            Span::from("⇥").bold(),
+            Span::from("[Tab]").bold(),
             Span::from(" show/hide"),
             Span::from(" | "),
             Span::from("↵").bold(),
@@ -383,7 +383,7 @@ fn render_wifi_ap_popup(app: &App, frame: &mut Frame) {
             Span::from("↑/↓").bold(),
             Span::from(" field"),
             Span::from(" | "),
-            Span::from("⇥").bold(),
+            Span::from("[Tab]").bold(),
             Span::from(" show/hide"),
             Span::from(" | "),
             Span::from("↵").bold(),
