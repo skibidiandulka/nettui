@@ -19,8 +19,14 @@ pub(super) fn render_enterprise_popup(app: &App, frame: &mut Frame) {
     let area = centered_rect(78, 74, frame.area());
     frame.render_widget(Clear, area);
 
+    let title = if prompt.editing_existing {
+        " Enterprise Wi-Fi Edit "
+    } else {
+        " Enterprise Wi-Fi Setup "
+    };
+
     let block = Block::default()
-        .title(" Enterprise Wi-Fi Setup ")
+        .title(title)
         .borders(Borders::ALL)
         .border_type(BorderType::Thick)
         .border_style(Style::default().fg(Color::Blue));
@@ -79,7 +85,7 @@ pub(super) fn render_enterprise_popup(app: &App, frame: &mut Frame) {
             Span::from(" show/hide"),
             Span::from(" | "),
             Span::from("↵").bold(),
-            Span::from(" save + connect"),
+            Span::from(prompt.submit_action_label()),
             Span::from(" | "),
             Span::from("Esc").bold(),
             Span::from(" cancel"),

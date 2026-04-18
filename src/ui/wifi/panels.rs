@@ -1,5 +1,5 @@
 use super::styles::{secondary_row_style, secondary_text_style, section_block};
-use crate::{app::App, domain::common::WifiFocus, domain::wifi::WifiDeviceInfo};
+use crate::{app::App, domain::common::WifiFocus};
 use ratatui::{
     Frame,
     layout::{Constraint, Rect},
@@ -189,30 +189,33 @@ fn render_access_point_status(app: &mut App, frame: &mut Frame, area: Rect) {
             app.wifi
                 .access_point_iface
                 .clone()
-                .or_else(|| app.wifi.device.as_ref().map(|device| device.iface.clone()))
+                .or_else(|| {
+                    app.displayed_wifi_device()
+                        .map(|device| device.iface.clone())
+                })
                 .unwrap_or_else(|| "-".to_string()),
         ),
         Cell::from(
-            app.wifi
-                .device
-                .as_ref()
+            app.displayed_wifi_device()
                 .map(|device| device.state.clone())
                 .unwrap_or_else(|| "-".to_string()),
         ),
         Cell::from(
-            app.wifi
-                .device
-                .as_ref()
+            app.displayed_wifi_device()
                 .map(|device| device.frequency.clone())
                 .unwrap_or_else(|| "-".to_string()),
         ),
         Cell::from(
-            app.wifi
-                .device
-                .as_ref()
+            app.displayed_wifi_device()
                 .map(|device| device.security.clone())
                 .unwrap_or_else(|| "-".to_string()),
         ),
+        Cell::from(app.wifi.access_point_clients.len().to_string()),
+        Cell::from(if app.wifi_ap_needs_network_configuration() {
+            "Off"
+        } else {
+            "On"
+        }),
     ])];
 
     let table = Table::new(
@@ -223,12 +226,22 @@ fn render_access_point_status(app: &mut App, frame: &mut Frame, area: Rect) {
             Constraint::Length(12),
             Constraint::Length(14),
             Constraint::Length(14),
+            Constraint::Length(8),
+            Constraint::Length(6),
         ],
     )
     .header(
-        Row::new(vec!["SSID", "Interface", "State", "Frequency", "Security"])
-            .style(Style::default().fg(Color::Yellow).bold())
-            .bottom_margin(1),
+        Row::new(vec![
+            "SSID",
+            "Interface",
+            "State",
+            "Frequency",
+            "Security",
+            "Clients",
+            "DHCP",
+        ])
+        .style(Style::default().fg(Color::Yellow).bold())
+        .bottom_margin(1),
     )
     .block(section_block(title, focused))
     .row_highlight_style(if focused {
@@ -252,7 +265,7 @@ fn render_access_point_clients(app: &mut App, frame: &mut Frame, area: Rect) {
 
     if rows.is_empty() {
         rows.push(Row::new(vec![
-            Cell::from("- no connected devices -").style(secondary_text_style()),
+            Cell::from("- waiting for clients -").style(secondary_text_style()),
         ]));
         if app.wifi_ap_needs_network_configuration() {
             rows.push(Row::new(vec![
@@ -280,30 +293,33 @@ fn render_access_point_clients(app: &mut App, frame: &mut Frame, area: Rect) {
 
 pub(super) fn render_device(app: &mut App, frame: &mut Frame, area: Rect) {
     let focused = app.wifi_focus == WifiFocus::Adapter;
-    let dev = app.wifi.device.clone().unwrap_or_else(|| WifiDeviceInfo {
-        iface: app
-            .wifi
-            .ifaces
-            .first()
-            .cloned()
-            .unwrap_or_else(|| "-".to_string()),
-        mode: "station".to_string(),
-        powered: "-".to_string(),
-        state: "-".to_string(),
-        scanning: "-".to_string(),
-        frequency: "-".to_string(),
-        security: "-".to_string(),
-    });
-
-    let rows = vec![Row::new(vec![
-        Cell::from(dev.iface),
-        Cell::from(dev.mode),
-        Cell::from(dev.powered),
-        Cell::from(dev.state),
-        Cell::from(dev.scanning),
-        Cell::from(dev.frequency),
-        Cell::from(dev.security),
-    ])];
+    let rows = if app.wifi.devices.is_empty() {
+        vec![Row::new(vec![
+            Cell::from("- no Wi-Fi adapters -").style(secondary_text_style()),
+            Cell::from(""),
+            Cell::from(""),
+            Cell::from(""),
+            Cell::from(""),
+            Cell::from(""),
+            Cell::from(""),
+        ])]
+    } else {
+        app.wifi
+            .devices
+            .iter()
+            .map(|dev| {
+                Row::new(vec![
+                    Cell::from(dev.iface.clone()),
+                    Cell::from(dev.mode.clone()),
+                    Cell::from(dev.powered.clone()),
+                    Cell::from(dev.state.clone()),
+                    Cell::from(dev.scanning.clone()),
+                    Cell::from(dev.frequency.clone()),
+                    Cell::from(dev.security.clone()),
+                ])
+            })
+            .collect()
+    };
 
     let table = Table::new(
         rows,
@@ -331,7 +347,7 @@ pub(super) fn render_device(app: &mut App, frame: &mut Frame, area: Rect) {
         .bottom_margin(1),
     )
     .column_spacing(1)
-    .block(section_block(" Device ", focused))
+    .block(section_block(" Devices ", focused))
     .row_highlight_style(if focused {
         Style::default().bg(Color::DarkGray).fg(Color::White)
     } else {

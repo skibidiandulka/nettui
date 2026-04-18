@@ -22,6 +22,8 @@ It is primarily meant for `Omarchy` and tested on `Omarchy`, but it should also 
 
 - `Wi-Fi` and `Ethernet`
 - Hidden SSID connect
+- Enterprise Wi-Fi setup and edit
+- Explicit multi-adapter Wi-Fi view
 - QR Wi-Fi sharing
 - Wi-Fi power toggle
 - Access point mode
@@ -92,10 +94,12 @@ Verify:
 sed -n '1,120p' ~/.local/share/omarchy/bin/omarchy-launch-wifi
 ```
 
-Optional Hyprland rule:
+No fixed-size Hyprland rule is required, and `nettui` no longer enforces a hard minimum terminal size.
+
+If you previously added one, remove it with:
 
 ```bash
-grep -q "match:class org.omarchy.nettui" ~/.config/hypr/apps/system.conf || echo "windowrule = size 1190 735, match:class org.omarchy.nettui" >> ~/.config/hypr/apps/system.conf
+sed -i '/match:class org\\.omarchy\\.nettui/d' ~/.config/hypr/apps/system.conf
 hyprctl reload
 ```
 
@@ -119,6 +123,7 @@ hyprctl reload
 - `t`: autoconnect
 - `n`: hidden network
 - `i`: details
+- `e`: edit 802.1x
 - `o`: power
 - `p`: access point
 
@@ -131,6 +136,7 @@ hyprctl reload
 
 - `Access point` mode is hardware-dependent.
 - Some adapters can scan and connect normally, but still fail in AP mode.
+- `nettui` warns when the Wi-Fi radio is blocked by `rfkill`.
 - For DHCP in AP mode, `/etc/iwd/main.conf` should enable:
 
 ```ini

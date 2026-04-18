@@ -32,6 +32,7 @@ pub struct WifiState {
     pub unavailable_known_networks: Vec<WifiNetwork>,
     pub new_networks: Vec<WifiNetwork>,
     pub hidden_networks: Vec<WifiNetwork>,
+    pub devices: Vec<WifiDeviceInfo>,
     pub device: Option<WifiDeviceInfo>,
 }
 
@@ -48,6 +49,7 @@ impl WifiState {
             unavailable_known_networks: Vec::new(),
             new_networks: Vec::new(),
             hidden_networks: Vec::new(),
+            devices: Vec::new(),
             device: None,
         }
     }

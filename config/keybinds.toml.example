@@ -16,6 +16,7 @@ wifi_share = "y"
 wifi_autoconnect = "t"
 wifi_hidden = "n"
 wifi_details = "i"
+wifi_edit = "e"
 wifi_access_point = "p"
 wifi_power = "o"
 

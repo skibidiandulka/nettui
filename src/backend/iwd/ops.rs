@@ -6,44 +6,39 @@ use std::fs;
 use tokio::process::Command;
 
 impl IwdBackend {
-    pub async fn scan(&self) -> Result<()> {
-        let session = Session::new().await.context("cannot access iwd service")?;
-        let station = session
-            .stations()
-            .await?
-            .pop()
+    pub async fn scan(&self, preferred_iface: Option<&str>) -> Result<()> {
+        let connection = system_bus_connection().await?;
+        let objects = load_managed_objects(&connection).await?;
+        let devices = device_snapshots_from_objects(&objects);
+        let device = select_device_snapshot(&devices, preferred_iface, WifiInterfaceRole::Station)
             .context("no wifi station found")?;
-        station.scan().await?;
-        Ok(())
+        station_scan(&connection, &device.path).await
     }
 
-    pub async fn disconnect(&self) -> Result<()> {
-        let session = Session::new().await.context("cannot access iwd service")?;
-        let station = session
-            .stations()
-            .await?
-            .pop()
+    pub async fn disconnect(&self, preferred_iface: Option<&str>) -> Result<()> {
+        let connection = system_bus_connection().await?;
+        let objects = load_managed_objects(&connection).await?;
+        let devices = device_snapshots_from_objects(&objects);
+        let device = select_device_snapshot(&devices, preferred_iface, WifiInterfaceRole::Station)
             .context("no wifi station found")?;
-        station.disconnect().await?;
-        Ok(())
+        station_disconnect(&connection, &device.path).await
     }
 
-    pub async fn connect(&self, ssid: &str) -> Result<()> {
-        let session = Session::new().await.context("cannot access iwd service")?;
-        let station = session
-            .stations()
-            .await?
-            .pop()
+    pub async fn connect(&self, preferred_iface: Option<&str>, ssid: &str) -> Result<()> {
+        let connection = system_bus_connection().await?;
+        let objects = load_managed_objects(&connection).await?;
+        let devices = device_snapshots_from_objects(&objects);
+        let device = select_device_snapshot(&devices, preferred_iface, WifiInterfaceRole::Station)
             .context("no wifi station found")?;
-        let discovered = station.discovered_networks().await?;
+        let discovered = station_discovered_networks(&connection, &device.path).await?;
 
-        for (network, _) in discovered {
-            let name = match network.name().await {
-                Ok(v) => v,
+        for (network_path, _) in discovered {
+            let name = match network_name(&connection, &network_path).await {
+                Ok(value) => value,
                 Err(_) => continue,
             };
             if name == ssid {
-                network.connect().await?;
+                network_connect(&connection, &network_path).await?;
                 return Ok(());
             }
         }
@@ -51,24 +46,24 @@ impl IwdBackend {
         Err(std::io::Error::other(format!("network not found: {ssid}")).into())
     }
 
-    pub async fn connect_hidden(&self, ssid: &str) -> Result<()> {
-        let session = Session::new().await.context("cannot access iwd service")?;
-        let station = session
-            .stations()
-            .await?
-            .pop()
+    pub async fn connect_hidden(&self, preferred_iface: Option<&str>, ssid: &str) -> Result<()> {
+        let connection = system_bus_connection().await?;
+        let objects = load_managed_objects(&connection).await?;
+        let devices = device_snapshots_from_objects(&objects);
+        let device = select_device_snapshot(&devices, preferred_iface, WifiInterfaceRole::Station)
             .context("no wifi station found")?;
-        station.connect_hidden_network(ssid.to_string()).await?;
-        Ok(())
+        station_connect_hidden_network(&connection, &device.path, ssid).await
     }
 
-    pub async fn connect_with_passphrase(&self, ssid: &str, passphrase: &str) -> Result<()> {
-        let session = Session::new().await.context("cannot access iwd service")?;
-        let iface = load_devices(&session)
-            .await?
-            .into_iter()
-            .find(|device| device.mode == Mode::Station)
-            .map(|device| device.iface)
+    pub async fn connect_with_passphrase(
+        &self,
+        preferred_iface: Option<&str>,
+        ssid: &str,
+        passphrase: &str,
+    ) -> Result<()> {
+        let devices = load_devices().await?;
+        let iface = select_device_snapshot(&devices, preferred_iface, WifiInterfaceRole::Station)
+            .map(|device| device.iface.clone())
             .context("no wifi adapter found")?;
 
         let out = Command::new("iwctl")
@@ -125,21 +120,14 @@ impl IwdBackend {
         Err(std::io::Error::other(format!("known network not found: {ssid}")).into())
     }
 
-    pub async fn toggle_power(&self) -> Result<bool> {
-        let session = Session::new().await.context("cannot access iwd service")?;
-        let devices = load_devices(&session).await?;
-        let target_iface = devices
-            .iter()
-            .find(|device| device.mode == Mode::Ap)
-            .or_else(|| devices.iter().find(|device| device.mode == Mode::Station))
-            .or_else(|| devices.first())
-            .map(|device| device.iface.clone())
+    pub async fn toggle_power(&self, preferred_iface: Option<&str>) -> Result<bool> {
+        let connection = system_bus_connection().await?;
+        let objects = load_managed_objects(&connection).await?;
+        let devices = device_snapshots_from_objects(&objects);
+        let device = select_device_snapshot(&devices, preferred_iface, WifiInterfaceRole::Any)
             .context("no wifi device found")?;
-        let device = find_device_by_name(&session, &target_iface)
-            .await?
-            .context("no wifi device found")?;
-        let next_power = !device.is_powered().await.unwrap_or(true);
-        device.set_power(next_power).await?;
+        let next_power = !device.powered;
+        device_set_power(&connection, &device.path, next_power).await?;
         Ok(next_power)
     }
 
@@ -172,60 +160,53 @@ impl IwdBackend {
         write_protected_file(&path, &contents, "failed to write iwd enterprise profile").await
     }
 
-    pub async fn start_access_point(&self, ssid: &str, passphrase: &str) -> Result<()> {
-        let session = Session::new().await.context("cannot access iwd service")?;
-        let devices = load_devices(&session).await?;
-        let target_iface = devices
-            .iter()
-            .find(|device| device.mode == Mode::Station)
-            .or_else(|| devices.first())
-            .map(|device| device.iface.clone())
-            .context("no wifi device found")?;
-        let device = find_device_by_name(&session, &target_iface)
-            .await?
-            .context("no wifi device found")?;
-        device.set_mode(Mode::Ap).await?;
-        let session = Session::new().await.context("cannot access iwd service")?;
-        let access_point = session
-            .access_points()
-            .await?
-            .pop()
-            .context("no access point interface found")?;
+    pub async fn read_enterprise_profile(
+        &self,
+        ssid: &str,
+    ) -> Result<Option<WifiEnterpriseProfile>> {
+        let encoded_name = iwd_network_name(ssid);
+        let path = std::path::Path::new("/var/lib/iwd").join(format!("{encoded_name}.8021x"));
+        if !path.exists() {
+            return Ok(None);
+        }
 
-        match access_point.start(ssid, passphrase).await {
+        let raw = read_protected_file(path.to_string_lossy().as_ref()).await?;
+        Ok(Some(WifiEnterpriseProfile::from_iwd_profile(ssid, &raw)?))
+    }
+
+    pub async fn start_access_point(
+        &self,
+        preferred_iface: Option<&str>,
+        ssid: &str,
+        passphrase: &str,
+    ) -> Result<()> {
+        let connection = system_bus_connection().await?;
+        let objects = load_managed_objects(&connection).await?;
+        let devices = device_snapshots_from_objects(&objects);
+        let device = select_device_snapshot(&devices, preferred_iface, WifiInterfaceRole::Any)
+            .context("no wifi device found")?;
+        device_set_mode(&connection, &device.path, Mode::Ap).await?;
+
+        match access_point_start(&connection, &device.path, ssid, passphrase).await {
             Ok(()) => Ok(()),
             Err(err) if should_retry_access_point_with_profile(&err.to_string()) => {
                 write_ap_profile(ssid, passphrase).await?;
-                let session = Session::new().await.context("cannot access iwd service")?;
-                let access_point = session
-                    .access_points()
-                    .await?
-                    .pop()
-                    .context("no access point interface found")?;
-                access_point.start_profile(ssid).await?;
+                access_point_start_profile(&connection, &device.path, ssid).await?;
                 Ok(())
             }
-            Err(err) => Err(err.into()),
+            Err(err) => Err(err),
         }
     }
 
-    pub async fn stop_access_point(&self) -> Result<()> {
-        let session = Session::new().await.context("cannot access iwd service")?;
-        let access_point = session
-            .access_points()
-            .await?
-            .pop()
-            .context("no access point interface found")?;
-        access_point.stop().await?;
-        if let Some(ap_iface) = load_devices(&session)
-            .await?
-            .iter()
-            .find(|device| device.mode == Mode::Ap)
-            .map(|device| device.iface.clone())
-            && let Some(device) = find_device_by_name(&session, &ap_iface).await?
-        {
-            device.set_mode(Mode::Station).await?;
-        }
+    pub async fn stop_access_point(&self, preferred_iface: Option<&str>) -> Result<()> {
+        let connection = system_bus_connection().await?;
+        let objects = load_managed_objects(&connection).await?;
+        let devices = device_snapshots_from_objects(&objects);
+        let device =
+            select_device_snapshot(&devices, preferred_iface, WifiInterfaceRole::AccessPoint)
+                .context("no access point interface found")?;
+        access_point_stop(&connection, &device.path).await?;
+        device_set_mode(&connection, &device.path, Mode::Station).await?;
         Ok(())
     }
 

@@ -168,6 +168,18 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> Result<()>
 
         KeyCode::Char(c)
             if app.active_tab == ActiveTab::Wifi
+                && app.wifi_focus == WifiFocus::KnownNetworks
+                && c.eq_ignore_ascii_case(&app.keybinds.wifi_edit) =>
+        {
+            if app.block_if_busy("editing enterprise Wi-Fi settings") {
+                return Ok(());
+            }
+            app.clear_error();
+            app.wifi_edit_selected_enterprise().await?;
+        }
+
+        KeyCode::Char(c)
+            if app.active_tab == ActiveTab::Wifi
                 && app.wifi_focus == WifiFocus::NewNetworks
                 && c.eq_ignore_ascii_case(&app.keybinds.wifi_hidden) =>
         {

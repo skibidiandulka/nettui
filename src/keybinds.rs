@@ -19,6 +19,7 @@ pub struct Keybinds {
     pub wifi_autoconnect: char,
     pub wifi_hidden: char,
     pub wifi_details: char,
+    pub wifi_edit: char,
     pub wifi_access_point: char,
     pub wifi_power: char,
     pub ethernet_renew: char,
@@ -40,6 +41,7 @@ impl Default for Keybinds {
             wifi_autoconnect: 't',
             wifi_hidden: 'n',
             wifi_details: 'i',
+            wifi_edit: 'e',
             wifi_access_point: 'p',
             wifi_power: 'o',
             ethernet_renew: 'n',
@@ -79,6 +81,7 @@ impl Keybinds {
         apply_override(&mut out.wifi_autoconnect, keys.wifi_autoconnect);
         apply_override(&mut out.wifi_hidden, keys.wifi_hidden);
         apply_override(&mut out.wifi_details, keys.wifi_details);
+        apply_override(&mut out.wifi_edit, keys.wifi_edit);
         apply_override(&mut out.wifi_access_point, keys.wifi_access_point);
         apply_override(&mut out.wifi_power, keys.wifi_power);
         apply_override(&mut out.ethernet_renew, keys.ethernet_renew);
@@ -107,6 +110,7 @@ struct KeybindsPartial {
     wifi_autoconnect: Option<String>,
     wifi_hidden: Option<String>,
     wifi_details: Option<String>,
+    wifi_edit: Option<String>,
     wifi_access_point: Option<String>,
     wifi_power: Option<String>,
     ethernet_renew: Option<String>,

@@ -46,6 +46,7 @@ pub fn render_footer(app: &App, frame: &mut Frame, area: Rect) {
     let wifi_autoconnect = app.keybinds.wifi_autoconnect.to_string();
     let wifi_hidden = app.keybinds.wifi_hidden.to_string();
     let wifi_details = app.keybinds.wifi_details.to_string();
+    let wifi_edit = app.keybinds.wifi_edit.to_string();
     let wifi_access_point = app.keybinds.wifi_access_point.to_string();
     let wifi_power = app.keybinds.wifi_power.to_string();
     let ethernet_renew = app.keybinds.ethernet_renew.to_string();
@@ -103,32 +104,46 @@ pub fn render_footer(app: &App, frame: &mut Frame, area: Rect) {
             ]),
         },
         ActiveTab::Wifi => match app.wifi_focus {
-            WifiFocus::KnownNetworks => line2.extend([
-                Span::from("↵").bold(),
-                Span::from(" dis/connect"),
-                Span::from(" | "),
-                Span::from(wifi_show_all.clone()).bold(),
-                Span::from(" show all"),
-                Span::from(" | "),
-                Span::from(wifi_forget).bold(),
-                Span::from(" forget"),
-                Span::from(" | "),
-                Span::from(wifi_share).bold(),
-                Span::from(" share"),
-                Span::from(" | "),
-                Span::from(wifi_autoconnect).bold(),
-                Span::from(" autoconnect"),
-                Span::from(" | "),
-                Span::from(wifi_scan.clone()).bold(),
-                Span::from(" scan"),
-                Span::from(" | "),
-                Span::from(wifi_access_point.clone()).bold(),
-                Span::from(if app.wifi_access_point_active() {
-                    " stop AP"
-                } else {
-                    " access point"
-                }),
-            ]),
+            WifiFocus::KnownNetworks => {
+                line2.extend([
+                    Span::from("↵").bold(),
+                    Span::from(" dis/connect"),
+                    Span::from(" | "),
+                    Span::from(wifi_show_all.clone()).bold(),
+                    Span::from(" show all"),
+                    Span::from(" | "),
+                    Span::from(wifi_forget).bold(),
+                    Span::from(" forget"),
+                    Span::from(" | "),
+                    Span::from(wifi_share).bold(),
+                    Span::from(" share"),
+                    Span::from(" | "),
+                    Span::from(wifi_autoconnect).bold(),
+                    Span::from(" autoconnect"),
+                ]);
+                if app
+                    .selected_wifi_network()
+                    .is_some_and(|net| net.is_enterprise())
+                {
+                    line2.extend([
+                        Span::from(" | "),
+                        Span::from(wifi_edit).bold(),
+                        Span::from(" edit 8021x"),
+                    ]);
+                }
+                line2.extend([
+                    Span::from(" | "),
+                    Span::from(wifi_scan.clone()).bold(),
+                    Span::from(" scan"),
+                    Span::from(" | "),
+                    Span::from(wifi_access_point.clone()).bold(),
+                    Span::from(if app.wifi_access_point_active() {
+                        " stop AP"
+                    } else {
+                        " access point"
+                    }),
+                ]);
+            }
             WifiFocus::NewNetworks => line2.extend([
                 Span::from("↵").bold(),
                 Span::from(" connect"),
@@ -220,27 +235,6 @@ pub fn render_toast_popup(frame: &mut Frame, kind: ToastKind, msg: &str, stack_i
         .style(Style::default().fg(Color::White))
         .wrap(ratatui::widgets::Wrap { trim: false });
 
-    frame.render_widget(p, inner);
-}
-
-pub fn render_too_small(frame: &mut Frame, area: Rect, min_w: u16, min_h: u16) {
-    let block = Block::default()
-        .title(" nettui ")
-        .borders(Borders::ALL)
-        .border_type(BorderType::Thick)
-        .border_style(Style::default().fg(Color::Yellow));
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
-
-    let msg = format!(
-        "Terminal is too small.\\n\\nMinimum size: {}x{}\\nCurrent size:  {}x{}",
-        min_w, min_h, area.width, area.height
-    );
-
-    let p = Paragraph::new(msg)
-        .alignment(Alignment::Center)
-        .style(Style::default().fg(Color::White))
-        .wrap(ratatui::widgets::Wrap { trim: true });
     frame.render_widget(p, inner);
 }
 

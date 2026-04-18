@@ -27,7 +27,7 @@ use iwdrs::agent::AgentManager;
 use ratatui::widgets::TableState;
 use std::{
     collections::VecDeque,
-    env,
+    env, fs,
     time::{Duration, Instant},
 };
 use tokio::process::Command;
@@ -72,6 +72,7 @@ pub struct App {
     pub wifi_adapter_state: TableState,
     pub wifi_iface_details: Option<EthernetIface>,
     pub show_wifi_details: bool,
+    pub wifi_backend_issues: Vec<String>,
     pub show_unavailable_known_networks: bool,
     pub show_hidden_networks: bool,
     pub hidden_connect_prompt: bool,
@@ -164,6 +165,8 @@ pub enum WifiEnterprisePromptField {
 pub struct WifiEnterprisePrompt {
     pub ssid: String,
     pub profile: WifiEnterpriseProfile,
+    pub editing_existing: bool,
+    pub connect_after_save: bool,
     pub focus: WifiEnterprisePromptField,
     pub key_passphrase_visible: bool,
     pub phase2_password_visible: bool,
@@ -291,6 +294,25 @@ impl WifiEnterprisePrompt {
         Self {
             profile: WifiEnterpriseProfile::new_for_ssid(&ssid),
             ssid,
+            editing_existing: false,
+            connect_after_save: true,
+            focus: WifiEnterprisePromptField::Method,
+            key_passphrase_visible: false,
+            phase2_password_visible: false,
+            password_visible: false,
+        }
+    }
+
+    fn from_existing(
+        ssid: String,
+        profile: WifiEnterpriseProfile,
+        connect_after_save: bool,
+    ) -> Self {
+        Self {
+            ssid,
+            profile,
+            editing_existing: true,
+            connect_after_save,
             focus: WifiEnterprisePromptField::Method,
             key_passphrase_visible: false,
             phase2_password_visible: false,
@@ -416,6 +438,16 @@ impl WifiEnterprisePrompt {
             _ => {}
         }
     }
+
+    pub fn submit_action_label(&self) -> &'static str {
+        if !self.connect_after_save {
+            " save only"
+        } else if self.editing_existing {
+            " save + reconnect"
+        } else {
+            " save + connect"
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -443,18 +475,13 @@ impl App {
         let wifi_backend = IwdBackend::new();
         let eth_backend = NetworkdBackend::new();
 
-        let (wifi, wifi_start_error) = match wifi_backend.query_state().await {
+        let (wifi, wifi_start_error) = match wifi_backend.query_state(None).await {
             Ok(wifi) => (wifi, None),
             Err(err) => (WifiState::empty(), Some(err)),
         };
         let ethernet = EthernetState {
             ifaces: eth_backend.list_ifaces().unwrap_or_default(),
         };
-        let wifi_iface_details = wifi
-            .device
-            .as_ref()
-            .map(|device| device.iface.clone())
-            .and_then(|iface| eth_backend.iface_details(&iface).ok());
         let active_tab = determine_start_tab(config.startup_policy, &wifi, &ethernet);
 
         let mut app = Self {
@@ -467,8 +494,9 @@ impl App {
             wifi_known_state: TableState::default(),
             wifi_new_state: TableState::default(),
             wifi_adapter_state: TableState::default(),
-            wifi_iface_details,
+            wifi_iface_details: None,
             show_wifi_details: false,
+            wifi_backend_issues: Vec::new(),
             show_unavailable_known_networks: false,
             show_hidden_networks: false,
             hidden_connect_prompt: false,
@@ -508,6 +536,7 @@ impl App {
         };
 
         app.init_wifi_states();
+        app.sync_wifi_iface_details();
         app.init_ethernet_state();
         if let Some(err) = wifi_start_error {
             app.set_toast(
@@ -520,7 +549,8 @@ impl App {
             app.wifi_auth_agent = Some(agent_manager);
             app.wifi_auth_events = Some(auth_events);
         }
-        if let Some(msg) = detect_conflicting_wifi_services().await {
+        app.wifi_backend_issues = detect_wifi_backend_issues(&app.wifi).await;
+        for msg in app.wifi_backend_issues.clone() {
             app.last_action = Some(msg.clone());
             app.set_toast(ToastKind::Info, msg);
         }
@@ -558,18 +588,19 @@ impl App {
     async fn refresh_all(&mut self) {
         let known_ssid = self.selected_known_ssid();
         let new_ssid = self.selected_new_ssid();
+        let selected_device_iface = self.selected_wifi_device_iface();
         let selected_eth = self.selected_eth_iface().map(|i| i.name.clone());
 
-        match self.wifi_backend.query_state().await {
+        match self
+            .wifi_backend
+            .query_state(selected_device_iface.as_deref())
+            .await
+        {
             Ok(wifi) => {
                 self.wifi = wifi;
-                self.restore_wifi_selection(known_ssid, new_ssid);
-                self.wifi_iface_details = self
-                    .wifi
-                    .device
-                    .as_ref()
-                    .map(|device| device.iface.clone())
-                    .and_then(|iface| self.eth_backend.iface_details(&iface).ok());
+                self.wifi_backend_issues = detect_wifi_backend_issues(&self.wifi).await;
+                self.restore_wifi_selection(known_ssid, new_ssid, selected_device_iface);
+                self.sync_wifi_iface_details();
             }
             Err(err) => {
                 self.push_toast(
@@ -608,6 +639,12 @@ impl App {
                 self.ethernet.ifaces.len()
             ),
         );
+    }
+
+    fn sync_wifi_iface_details(&mut self) {
+        self.wifi_iface_details = self
+            .displayed_wifi_iface()
+            .and_then(|iface| self.eth_backend.iface_details(iface).ok());
     }
 
     fn request_refresh(&mut self) {
@@ -676,7 +713,9 @@ impl App {
                 }
                 WifiFocus::Adapter => {
                     let len = self.device_total_len();
-                    select_next_in_state(&mut self.wifi_adapter_state, len)
+                    select_next_in_state(&mut self.wifi_adapter_state, len);
+                    self.sync_wifi_iface_details();
+                    self.request_refresh();
                 }
             },
             ActiveTab::Ethernet => {
@@ -698,7 +737,9 @@ impl App {
                 }
                 WifiFocus::Adapter => {
                     let len = self.device_total_len();
-                    select_prev_in_state(&mut self.wifi_adapter_state, len)
+                    select_prev_in_state(&mut self.wifi_adapter_state, len);
+                    self.sync_wifi_iface_details();
+                    self.request_refresh();
                 }
             },
             ActiveTab::Ethernet => {
@@ -764,7 +805,11 @@ impl App {
         if let Some(prompt) = &self.wifi_enterprise_prompt {
             return Some(Toast {
                 kind: ToastKind::Info,
-                msg: format!("Configure enterprise Wi-Fi for {}", prompt.ssid),
+                msg: if prompt.editing_existing {
+                    format!("Edit enterprise Wi-Fi for {}", prompt.ssid)
+                } else {
+                    format!("Configure enterprise Wi-Fi for {}", prompt.ssid)
+                },
                 until: None,
             });
         }
@@ -912,6 +957,23 @@ pub fn determine_start_tab(
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum WifiRfkillBlock {
+    Soft,
+    Hard,
+}
+
+async fn detect_wifi_backend_issues(wifi: &WifiState) -> Vec<String> {
+    let mut issues = Vec::new();
+    if let Some(msg) = detect_conflicting_wifi_services().await {
+        issues.push(msg);
+    }
+    if let Some(msg) = detect_wifi_rfkill_issue(wifi.has_adapter()) {
+        issues.push(msg);
+    }
+    issues
+}
+
 async fn detect_conflicting_wifi_services() -> Option<String> {
     let mut active = Vec::new();
     if is_service_active("NetworkManager.service").await {
@@ -927,6 +989,74 @@ async fn detect_conflicting_wifi_services() -> Option<String> {
             "Detected active Wi-Fi manager(s): {}. iwd backend works best without overlapping Wi-Fi managers.",
             active.join(", ")
         ))
+    }
+}
+
+fn detect_wifi_rfkill_issue(has_adapter: bool) -> Option<String> {
+    wifi_rfkill_issue_message(has_adapter, detect_wifi_rfkill_block())
+}
+
+fn detect_wifi_rfkill_block() -> Option<WifiRfkillBlock> {
+    let Ok(entries) = fs::read_dir("/sys/class/rfkill") else {
+        return None;
+    };
+
+    let mut soft_blocked = false;
+    let mut hard_blocked = false;
+
+    for entry in entries.flatten() {
+        let entry_path = entry.path();
+        let Ok(kind) = fs::read_to_string(entry_path.join("type")) else {
+            continue;
+        };
+        if kind.trim() != "wlan" {
+            continue;
+        }
+
+        let state = read_rfkill_state(&entry_path.join("state"));
+        soft_blocked |= read_rfkill_flag(&entry_path.join("soft")).unwrap_or(state == Some(0));
+        hard_blocked |= read_rfkill_flag(&entry_path.join("hard")).unwrap_or(state == Some(2));
+    }
+
+    if hard_blocked {
+        Some(WifiRfkillBlock::Hard)
+    } else if soft_blocked {
+        Some(WifiRfkillBlock::Soft)
+    } else {
+        None
+    }
+}
+
+fn read_rfkill_flag(path: &std::path::Path) -> Option<bool> {
+    fs::read_to_string(path)
+        .ok()
+        .map(|value| value.trim() == "1")
+}
+
+fn read_rfkill_state(path: &std::path::Path) -> Option<u8> {
+    fs::read_to_string(path)
+        .ok()
+        .and_then(|value| value.trim().parse::<u8>().ok())
+}
+
+fn wifi_rfkill_issue_message(
+    has_adapter: bool,
+    blocked: Option<WifiRfkillBlock>,
+) -> Option<String> {
+    if !has_adapter {
+        return None;
+    }
+
+    match blocked {
+        Some(WifiRfkillBlock::Soft) => Some(
+            "Wi-Fi radio is soft blocked by rfkill. Run `rfkill unblock wlan` or `rfkill unblock wifi`."
+                .to_string(),
+        ),
+        Some(WifiRfkillBlock::Hard) => Some(
+            "Wi-Fi radio is hard blocked by rfkill. Check the hardware switch or firmware settings."
+                .to_string(),
+        ),
+        None => None,
     }
 }
 
@@ -1037,6 +1167,13 @@ fn friendly_wifi_error(action: &str, err: &anyhow::Error) -> String {
     }
     if lower.contains("already exists") {
         return "That access point is already active.".to_string();
+    }
+    if lower.contains("rf-kill")
+        || lower.contains("rfkill")
+        || lower.contains("soft blocked")
+        || lower.contains("hard blocked")
+    {
+        return "Wi-Fi radio is blocked by rfkill. Unblock it and try again.".to_string();
     }
     if lower.contains("no wifi station found") || lower.contains("no wifi adapter found") {
         return "No Wi-Fi adapter found.".to_string();
@@ -1189,6 +1326,7 @@ mod tests {
             unavailable_known_networks: vec![],
             new_networks: vec![],
             hidden_networks: vec![],
+            devices: vec![],
             device: None,
         };
         let ethernet = EthernetState {
@@ -1224,6 +1362,7 @@ mod tests {
             unavailable_known_networks: vec![],
             new_networks: vec![],
             hidden_networks: vec![],
+            devices: vec![],
             device: None,
         };
         let ethernet = EthernetState { ifaces: vec![] };
@@ -1247,6 +1386,7 @@ mod tests {
             unavailable_known_networks: vec![],
             new_networks: vec![],
             hidden_networks: vec![],
+            devices: vec![],
             device: None,
         };
         let ethernet = EthernetState {
@@ -1339,6 +1479,31 @@ mod tests {
             ethernet_backend_issue_message(true, true, false).as_deref(),
             Some(
                 "systemd-networkd is not active. Ethernet renew and state reporting may be limited until it is enabled."
+            )
+        );
+    }
+
+    #[test]
+    fn wifi_rfkill_warning_is_silent_without_adapter() {
+        assert!(wifi_rfkill_issue_message(false, Some(WifiRfkillBlock::Soft)).is_none());
+    }
+
+    #[test]
+    fn wifi_rfkill_warning_detects_soft_block() {
+        assert_eq!(
+            wifi_rfkill_issue_message(true, Some(WifiRfkillBlock::Soft)).as_deref(),
+            Some(
+                "Wi-Fi radio is soft blocked by rfkill. Run `rfkill unblock wlan` or `rfkill unblock wifi`."
+            )
+        );
+    }
+
+    #[test]
+    fn wifi_rfkill_warning_detects_hard_block() {
+        assert_eq!(
+            wifi_rfkill_issue_message(true, Some(WifiRfkillBlock::Hard)).as_deref(),
+            Some(
+                "Wi-Fi radio is hard blocked by rfkill. Check the hardware switch or firmware settings."
             )
         );
     }

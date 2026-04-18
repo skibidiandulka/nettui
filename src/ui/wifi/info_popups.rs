@@ -90,10 +90,14 @@ fn render_details_popup(app: &App, frame: &mut Frame) {
     frame.render_widget(Clear, area);
 
     let title = app
-        .wifi
-        .ifaces
-        .first()
-        .map(|i| format!(" Wi-Fi Details ({i}) "))
+        .displayed_wifi_device()
+        .map(|device| format!(" Wi-Fi Details ({}) ", device.iface))
+        .or_else(|| {
+            app.wifi
+                .ifaces
+                .first()
+                .map(|iface| format!(" Wi-Fi Details ({iface}) "))
+        })
         .unwrap_or_else(|| " Wi-Fi Details ".to_string());
 
     let block = Block::default()
@@ -105,18 +109,78 @@ fn render_details_popup(app: &App, frame: &mut Frame) {
     frame.render_widget(block, area);
 
     let lines = if let Some(details) = &app.wifi_iface_details {
+        let connection_label = if app.wifi_access_point_active() {
+            "Access Point SSID: "
+        } else {
+            "Connected SSID: "
+        };
+        let connection_value = if app.wifi_access_point_active() {
+            app.wifi
+                .access_point_ssid
+                .clone()
+                .unwrap_or_else(|| "Not running".to_string())
+        } else {
+            app.wifi
+                .connected_ssid
+                .clone()
+                .unwrap_or_else(|| "Not connected".to_string())
+        };
         let mut lines = vec![
             Line::from(vec![
-                Span::from("Connected SSID: ").bold(),
-                Span::from(
-                    app.wifi
-                        .connected_ssid
-                        .clone()
-                        .unwrap_or_else(|| "Not connected".to_string()),
-                )
-                .fg(Color::Cyan),
+                Span::from(connection_label).bold(),
+                Span::from(connection_value).fg(Color::Cyan),
             ]),
             Line::from(""),
+        ];
+
+        if let Some(device) = app.displayed_wifi_device() {
+            lines.extend([
+                Line::from(vec![
+                    Span::from("Interface: ").bold(),
+                    Span::from(device.iface.clone()),
+                ]),
+                Line::from(vec![
+                    Span::from("Mode: ").bold(),
+                    Span::from(device.mode.clone()),
+                ]),
+                Line::from(vec![
+                    Span::from("Powered: ").bold(),
+                    Span::from(device.powered.clone()),
+                ]),
+                Line::from(vec![
+                    Span::from("Scanning: ").bold(),
+                    Span::from(device.scanning.clone()),
+                ]),
+                Line::from(vec![
+                    Span::from("Frequency: ").bold(),
+                    Span::from(device.frequency.clone()),
+                ]),
+                Line::from(vec![
+                    Span::from("Security: ").bold(),
+                    Span::from(device.security.clone()),
+                ]),
+                Line::from(""),
+            ]);
+            if app.wifi_access_point_active() {
+                lines.extend([
+                    Line::from(vec![
+                        Span::from("Connected devices: ").bold(),
+                        Span::from(app.wifi.access_point_clients.len().to_string()),
+                    ]),
+                    Line::from(vec![
+                        Span::from("DHCP via iwd: ").bold(),
+                        Span::from(if app.wifi_ap_needs_network_configuration() {
+                            "No"
+                        } else {
+                            "Yes"
+                        }),
+                    ]),
+                    Line::from(""),
+                ]);
+            }
+        }
+
+        lines.extend([
             Line::from(vec![
                 Span::from("State: ").bold(),
                 Span::from(details.operstate.clone()),
@@ -154,7 +218,7 @@ fn render_details_popup(app: &App, frame: &mut Frame) {
             ]),
             Line::from(""),
             Line::from(Span::from("IPv4").bold()),
-        ];
+        ]);
 
         if details.ipv4.is_empty() {
             lines.push(Line::from("  -"));
@@ -171,6 +235,17 @@ fn render_details_popup(app: &App, frame: &mut Frame) {
         } else {
             for ip in &details.ipv6 {
                 lines.push(Line::from(format!("  {ip}")));
+            }
+        }
+
+        if !app.wifi_backend_issues.is_empty() {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::from("Backend warnings").bold()));
+            for msg in &app.wifi_backend_issues {
+                lines.push(Line::from(vec![
+                    Span::from("  - ").bold(),
+                    Span::from(msg.as_str()).fg(Color::Yellow),
+                ]));
             }
         }
 

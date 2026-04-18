@@ -9,14 +9,7 @@ use ratatui::{
 };
 
 pub fn render(app: &mut App, frame: &mut Frame) {
-    const MIN_W: u16 = 119;
-    const MIN_H: u16 = 35;
-
     let area = frame.area();
-    if area.width < MIN_W || area.height < MIN_H {
-        components::render_too_small(frame, area, MIN_W, MIN_H);
-        return;
-    }
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)

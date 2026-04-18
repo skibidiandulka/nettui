@@ -75,6 +75,19 @@ impl App {
         self.wifi_enterprise_prompt = Some(WifiEnterprisePrompt::new(ssid));
     }
 
+    pub fn open_existing_wifi_enterprise_prompt(
+        &mut self,
+        ssid: String,
+        profile: WifiEnterpriseProfile,
+        connect_after_save: bool,
+    ) {
+        self.wifi_enterprise_prompt = Some(WifiEnterprisePrompt::from_existing(
+            ssid,
+            profile,
+            connect_after_save,
+        ));
+    }
+
     pub fn close_wifi_auth_prompt(&mut self) {
         if let Some(prompt) = self.wifi_auth_prompt.take() {
             prompt.cancel();
@@ -319,7 +332,12 @@ impl App {
             return;
         }
 
-        match self.wifi_backend.connect_hidden(&ssid).await {
+        let preferred_iface = self.preferred_station_iface().map(str::to_owned);
+        match self
+            .wifi_backend
+            .connect_hidden(preferred_iface.as_deref(), &ssid)
+            .await
+        {
             Ok(()) => {
                 self.last_action = Some(format!("Connect hidden requested: {ssid}"));
                 self.set_toast(ToastKind::Info, format!("Connect hidden requested: {ssid}"));
@@ -364,6 +382,7 @@ impl App {
 
                 let ssid = prompt.ssid.clone();
                 let passphrase = prompt.primary_input.clone();
+                let preferred_iface = self.preferred_station_iface().map(str::to_owned);
                 self.last_action = Some(format!("Connecting to {ssid}..."));
                 self.wifi_connect_pending = true;
                 self.wifi_connect_started_at = Some(Instant::now());
@@ -374,7 +393,7 @@ impl App {
                 });
                 self.wifi_connect_task = Some(tokio::spawn(async move {
                     IwdBackend::new()
-                        .connect_with_passphrase(&ssid, &passphrase)
+                        .connect_with_passphrase(preferred_iface.as_deref(), &ssid, &passphrase)
                         .await
                 }));
             }
@@ -432,6 +451,18 @@ impl App {
         }
 
         let ssid = prompt.ssid.clone();
+        if !prompt.connect_after_save {
+            self.last_action = Some(format!("Saved enterprise profile for {ssid}"));
+            self.set_toast(
+                ToastKind::Success,
+                format!("Saved enterprise profile for {ssid}"),
+            );
+            self.notify("Wi-Fi", &format!("Saved enterprise profile for {ssid}"));
+            self.request_refresh();
+            return;
+        }
+
+        let preferred_iface = self.preferred_station_iface().map(str::to_owned);
         self.last_action = Some(format!("Connecting to {ssid}..."));
         self.wifi_connect_pending = true;
         self.wifi_connect_started_at = Some(Instant::now());
@@ -441,8 +472,64 @@ impl App {
             used_passphrase: false,
         });
         self.wifi_connect_task = Some(tokio::spawn(async move {
-            IwdBackend::new().connect(&ssid).await
+            IwdBackend::new()
+                .connect(preferred_iface.as_deref(), &ssid)
+                .await
         }));
+    }
+
+    pub async fn wifi_edit_selected_enterprise(&mut self) -> Result<()> {
+        if self.wifi_focus != WifiFocus::KnownNetworks {
+            self.set_toast(
+                ToastKind::Info,
+                "Enterprise edit is available in Known Networks",
+            );
+            return Ok(());
+        }
+
+        let Some(net) = self.selected_known_network().cloned() else {
+            self.set_toast(ToastKind::Error, "No known network selected");
+            return Ok(());
+        };
+
+        if !net.is_enterprise() {
+            self.set_toast(
+                ToastKind::Info,
+                "Selected network does not use enterprise Wi-Fi",
+            );
+            return Ok(());
+        }
+
+        self.set_toast(
+            ToastKind::Info,
+            "Root access may be required to load saved enterprise Wi-Fi settings",
+        );
+        let ssid = net.ssid.clone();
+        let connect_after_save = net.available;
+
+        match self.wifi_backend.read_enterprise_profile(&ssid).await {
+            Ok(Some(profile)) => {
+                self.open_existing_wifi_enterprise_prompt(ssid, profile, connect_after_save);
+            }
+            Ok(None) => {
+                let mut prompt = WifiEnterprisePrompt::new(ssid);
+                prompt.editing_existing = true;
+                prompt.connect_after_save = connect_after_save;
+                self.wifi_enterprise_prompt = Some(prompt);
+                self.set_toast(
+                    ToastKind::Info,
+                    "No saved enterprise profile was found. Starting a new enterprise setup.",
+                );
+            }
+            Err(err) => {
+                self.set_toast(
+                    ToastKind::Error,
+                    friendly_wifi_error("load enterprise profile", &err),
+                );
+            }
+        }
+
+        Ok(())
     }
 
     pub async fn wifi_toggle_access_point_mode(&mut self) -> Result<()> {
@@ -457,6 +544,7 @@ impl App {
 
         if self.wifi_access_point_active() {
             let ssid = self.wifi.access_point_ssid.clone();
+            let preferred_iface = self.preferred_access_point_iface().map(str::to_owned);
             self.last_action = Some("Stopping Wi-Fi access point...".to_string());
             self.wifi_ap_pending = true;
             self.wifi_ap_started_at = Some(Instant::now());
@@ -464,8 +552,10 @@ impl App {
                 ssid,
                 stopping: true,
             });
-            self.wifi_ap_task = Some(tokio::spawn(async {
-                IwdBackend::new().stop_access_point().await
+            self.wifi_ap_task = Some(tokio::spawn(async move {
+                IwdBackend::new()
+                    .stop_access_point(preferred_iface.as_deref())
+                    .await
             }));
             return Ok(());
         }
@@ -505,13 +595,14 @@ impl App {
         self.close_wifi_ap_prompt();
         self.wifi_ap_pending = true;
         self.wifi_ap_started_at = Some(Instant::now());
+        let preferred_iface = self.preferred_wifi_iface().map(str::to_owned);
         self.wifi_ap_context = Some(WifiApContext {
             ssid: Some(ssid.clone()),
             stopping: false,
         });
         self.wifi_ap_task = Some(tokio::spawn(async move {
             IwdBackend::new()
-                .start_access_point(&ssid, &passphrase)
+                .start_access_point(preferred_iface.as_deref(), &ssid, &passphrase)
                 .await
         }));
     }
@@ -559,7 +650,10 @@ impl App {
         self.last_scan_request_at = Some(now);
         self.request_refresh();
         self.last_action = Some("Wi-Fi scan requested".to_string());
-        self.wifi_scan_task = Some(tokio::spawn(async { IwdBackend::new().scan().await }));
+        let preferred_iface = self.preferred_station_iface().map(str::to_owned);
+        self.wifi_scan_task = Some(tokio::spawn(async move {
+            IwdBackend::new().scan(preferred_iface.as_deref()).await
+        }));
         Ok(())
     }
 
@@ -609,6 +703,7 @@ impl App {
             disconnect,
             used_passphrase: false,
         });
+        let preferred_iface = self.preferred_station_iface().map(str::to_owned);
         self.last_action = Some(if disconnect {
             "Disconnecting Wi-Fi...".to_string()
         } else {
@@ -617,9 +712,13 @@ impl App {
 
         self.wifi_connect_task = Some(tokio::spawn(async move {
             if disconnect {
-                IwdBackend::new().disconnect().await
+                IwdBackend::new()
+                    .disconnect(preferred_iface.as_deref())
+                    .await
             } else {
-                IwdBackend::new().connect(&ssid).await
+                IwdBackend::new()
+                    .connect(preferred_iface.as_deref(), &ssid)
+                    .await
             }
         }));
 
@@ -719,7 +818,11 @@ impl App {
     }
 
     pub async fn wifi_toggle_power(&mut self) -> Result<()> {
-        let powered = self.wifi_backend.toggle_power().await?;
+        let preferred_iface = self.preferred_wifi_iface().map(str::to_owned);
+        let powered = self
+            .wifi_backend
+            .toggle_power(preferred_iface.as_deref())
+            .await?;
         self.request_refresh();
         self.last_action = Some(format!(
             "Wi-Fi adapter power {}",
