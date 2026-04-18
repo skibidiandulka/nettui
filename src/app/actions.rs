@@ -3,6 +3,31 @@ use anyhow::{Context, Result};
 use qrcode::{QrCode, render::unicode};
 use tokio::process::Command;
 
+fn wifi_qr_escape(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for ch in value.chars() {
+        match ch {
+            '\\' => out.push_str("\\\\"),
+            ';' | ',' | ':' | '"' => {
+                out.push('\\');
+                out.push(ch);
+            }
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            _ => out.push(ch),
+        }
+    }
+    out
+}
+
+fn build_wifi_qr_payload(ssid: &str, passphrase: &str) -> String {
+    format!(
+        "WIFI:T:WPA;S:{};P:{};;",
+        wifi_qr_escape(ssid),
+        wifi_qr_escape(passphrase)
+    )
+}
+
 impl App {
     pub fn toggle_wifi_details(&mut self) {
         if !self.wifi.has_adapter() {
@@ -16,6 +41,7 @@ impl App {
         self.show_unavailable_known_networks = !self.show_unavailable_known_networks;
         let len = self.known_total_len();
         clamp_selected(&mut self.wifi_known_state, len);
+        self.ensure_valid_wifi_focus();
         let state = if self.show_unavailable_known_networks {
             "enabled"
         } else {
@@ -34,6 +60,7 @@ impl App {
         self.show_hidden_networks = !self.show_hidden_networks;
         let len = self.new_total_len();
         clamp_selected(&mut self.wifi_new_state, len);
+        self.ensure_valid_wifi_focus();
         let state = if self.show_hidden_networks {
             "enabled"
         } else {
@@ -318,6 +345,12 @@ impl App {
     }
 
     pub async fn submit_hidden_connect(&mut self) {
+        if !self.wifi.has_adapter() {
+            self.set_toast(ToastKind::Error, "No Wi-Fi adapter found");
+            self.close_hidden_connect_prompt();
+            return;
+        }
+
         if self.wifi_access_point_active() {
             self.set_toast(
                 ToastKind::Info,
@@ -565,6 +598,12 @@ impl App {
     }
 
     pub async fn submit_wifi_ap_start(&mut self) {
+        if !self.wifi.has_adapter() {
+            self.close_wifi_ap_prompt();
+            self.set_toast(ToastKind::Error, "No Wi-Fi adapter found");
+            return;
+        }
+
         let ssid = self.wifi_ap_ssid_input.trim().to_string();
         let passphrase = self.wifi_ap_passphrase_input.clone();
 
@@ -622,6 +661,11 @@ impl App {
     }
 
     pub async fn wifi_scan(&mut self) -> Result<()> {
+        if !self.wifi.has_adapter() {
+            self.set_toast(ToastKind::Error, "No Wi-Fi adapter found");
+            return Ok(());
+        }
+
         if self.wifi_access_point_active() {
             self.set_toast(
                 ToastKind::Info,
@@ -658,6 +702,11 @@ impl App {
     }
 
     pub async fn wifi_connect_or_disconnect(&mut self) -> Result<()> {
+        if !self.wifi.has_adapter() {
+            self.set_toast(ToastKind::Error, "No Wi-Fi adapter found");
+            return Ok(());
+        }
+
         if self.wifi_access_point_active() {
             self.set_toast(
                 ToastKind::Info,
@@ -768,7 +817,7 @@ impl App {
         );
         let WifiShareCredentials { ssid, passphrase } =
             self.wifi_backend.load_share_credentials(&net.ssid).await?;
-        let qr_payload = format!("WIFI:T:WPA;S:{ssid};P:{passphrase};;");
+        let qr_payload = build_wifi_qr_payload(&ssid, &passphrase);
         let qr_text = QrCode::new(qr_payload.as_bytes())
             .context("failed to generate Wi-Fi QR code")?
             .render::<unicode::Dense1x2>()
@@ -818,6 +867,11 @@ impl App {
     }
 
     pub async fn wifi_toggle_power(&mut self) -> Result<()> {
+        if !self.wifi.has_adapter() {
+            self.set_toast(ToastKind::Error, "No Wi-Fi adapter found");
+            return Ok(());
+        }
+
         let preferred_iface = self.preferred_wifi_iface().map(str::to_owned);
         let powered = self
             .wifi_backend
@@ -921,5 +975,25 @@ impl App {
             .device
             .as_ref()
             .is_some_and(|device| device.mode == "access point")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::build_wifi_qr_payload;
+
+    #[test]
+    fn wifi_qr_payload_escapes_special_characters() {
+        let payload = build_wifi_qr_payload(r#"Cafe;Net:5\"#, r#"p;ass:word,\\"#);
+        assert_eq!(
+            payload,
+            r#"WIFI:T:WPA;S:Cafe\;Net\:5\\;P:p\;ass\:word\,\\\\;;"#
+        );
+    }
+
+    #[test]
+    fn wifi_qr_payload_escapes_line_breaks() {
+        let payload = build_wifi_qr_payload("Corp\nWiFi", "line\rbreak");
+        assert_eq!(payload, r#"WIFI:T:WPA;S:Corp\nWiFi;P:line\rbreak;;"#);
     }
 }

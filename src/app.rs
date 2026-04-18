@@ -34,6 +34,9 @@ use tokio::process::Command;
 use tokio::sync::{mpsc::UnboundedReceiver, oneshot};
 use tokio::task::JoinHandle;
 
+#[cfg(test)]
+use crate::domain::wifi::WifiDeviceInfo;
+
 #[derive(Debug, Clone, Copy)]
 pub struct AppConfig {
     pub startup_policy: StartupTabPolicy,
@@ -585,6 +588,37 @@ impl App {
         Ok(())
     }
 
+    fn dismiss_wifi_overlays_without_adapter(&mut self) {
+        if self.wifi.has_adapter() {
+            return;
+        }
+
+        let had_hidden = self.hidden_connect_prompt;
+        let had_auth = self.wifi_auth_prompt.is_some();
+        let had_enterprise = self.wifi_enterprise_prompt.is_some();
+        let had_ap = self.wifi_ap_prompt_open;
+
+        if had_hidden {
+            self.close_hidden_connect_prompt();
+        }
+        if had_auth {
+            self.close_wifi_auth_prompt();
+        }
+        if had_enterprise {
+            self.close_wifi_enterprise_prompt();
+        }
+        if had_ap {
+            self.close_wifi_ap_prompt();
+        }
+
+        if had_hidden || had_auth || had_enterprise || had_ap {
+            self.push_toast(
+                ToastKind::Info,
+                "Closed Wi-Fi prompts because no adapter is available.",
+            );
+        }
+    }
+
     async fn refresh_all(&mut self) {
         let known_ssid = self.selected_known_ssid();
         let new_ssid = self.selected_new_ssid();
@@ -601,6 +635,7 @@ impl App {
                 self.wifi_backend_issues = detect_wifi_backend_issues(&self.wifi).await;
                 self.restore_wifi_selection(known_ssid, new_ssid, selected_device_iface);
                 self.sync_wifi_iface_details();
+                self.dismiss_wifi_overlays_without_adapter();
             }
             Err(err) => {
                 self.push_toast(
@@ -1514,5 +1549,198 @@ mod tests {
         let shortened = shorten_banner_message(&msg);
         assert!(!shortened.contains('\n'));
         assert!(shortened.len() <= 120);
+    }
+
+    fn test_app() -> App {
+        App {
+            running: true,
+            config: AppConfig::default(),
+            active_tab: ActiveTab::Wifi,
+            wifi_focus: WifiFocus::KnownNetworks,
+            keybinds: Keybinds::default(),
+            wifi: WifiState::empty(),
+            wifi_known_state: TableState::default(),
+            wifi_new_state: TableState::default(),
+            wifi_adapter_state: TableState::default(),
+            wifi_iface_details: None,
+            show_wifi_details: false,
+            wifi_backend_issues: Vec::new(),
+            show_unavailable_known_networks: false,
+            show_hidden_networks: false,
+            hidden_connect_prompt: false,
+            hidden_ssid_input: String::new(),
+            wifi_auth_prompt: None,
+            wifi_enterprise_prompt: None,
+            wifi_ap_prompt_open: false,
+            wifi_ap_ssid_input: String::new(),
+            wifi_ap_passphrase_input: String::new(),
+            wifi_ap_passphrase_visible: false,
+            wifi_ap_prompt_field: WifiApPromptField::Ssid,
+            wifi_share_popup: None,
+            ethernet: EthernetState { ifaces: vec![] },
+            ethernet_state: TableState::default(),
+            ethernet_backend_issue: None,
+            last_error: None,
+            last_action: None,
+            toasts: VecDeque::new(),
+            wifi_scan_pending: false,
+            wifi_connect_pending: false,
+            wifi_ap_pending: false,
+            last_data_refresh_at: Instant::now(),
+            refresh_requested: false,
+            wifi_scan_started_at: None,
+            wifi_connect_started_at: None,
+            wifi_ap_started_at: None,
+            last_scan_request_at: None,
+            wifi_backend: IwdBackend::new(),
+            eth_backend: NetworkdBackend::new(),
+            wifi_auth_agent: None,
+            wifi_auth_events: None,
+            wifi_scan_task: None,
+            wifi_connect_task: None,
+            wifi_ap_task: None,
+            wifi_connect_context: None,
+            wifi_ap_context: None,
+        }
+    }
+
+    #[test]
+    fn selected_known_network_uses_unavailable_entries_when_enabled() {
+        let mut app = test_app();
+        app.show_unavailable_known_networks = true;
+        app.wifi.known_networks = vec![WifiNetwork {
+            ssid: "home".into(),
+            security: "WPA2".into(),
+            signal: "80%".into(),
+            connected: false,
+            hidden: Some(false),
+            autoconnect: Some(true),
+            available: true,
+        }];
+        app.wifi.unavailable_known_networks = vec![WifiNetwork {
+            ssid: "office".into(),
+            security: "WPA2".into(),
+            signal: "-".into(),
+            connected: false,
+            hidden: Some(false),
+            autoconnect: Some(true),
+            available: false,
+        }];
+        app.wifi_known_state.select(Some(1));
+
+        assert_eq!(
+            app.selected_known_network().map(|n| n.ssid.as_str()),
+            Some("office")
+        );
+    }
+
+    #[test]
+    fn selected_new_network_uses_hidden_entries_when_enabled() {
+        let mut app = test_app();
+        app.show_hidden_networks = true;
+        app.wifi.new_networks = vec![WifiNetwork {
+            ssid: "guest".into(),
+            security: "WPA2".into(),
+            signal: "70%".into(),
+            connected: false,
+            hidden: None,
+            autoconnect: None,
+            available: true,
+        }];
+        app.wifi.hidden_networks = vec![WifiNetwork {
+            ssid: "hidden".into(),
+            security: "WPA2".into(),
+            signal: "-".into(),
+            connected: false,
+            hidden: Some(true),
+            autoconnect: None,
+            available: false,
+        }];
+        app.wifi_new_state.select(Some(1));
+
+        assert_eq!(
+            app.selected_new_network().map(|n| n.ssid.as_str()),
+            Some("hidden")
+        );
+    }
+
+    #[test]
+    fn restore_wifi_selection_preserves_selected_device_iface() {
+        let mut app = test_app();
+        app.wifi.devices = vec![
+            WifiDeviceInfo {
+                iface: "wlan0".into(),
+                mode: "station".into(),
+                powered: "On".into(),
+                state: "connected".into(),
+                scanning: "No".into(),
+                frequency: "2412 MHz".into(),
+                security: "WPA2".into(),
+            },
+            WifiDeviceInfo {
+                iface: "wlan1".into(),
+                mode: "station".into(),
+                powered: "On".into(),
+                state: "idle".into(),
+                scanning: "No".into(),
+                frequency: "5180 MHz".into(),
+                security: "WPA2".into(),
+            },
+        ];
+
+        app.restore_wifi_selection(None, None, Some("wlan1".into()));
+
+        assert_eq!(
+            app.selected_wifi_device().map(|d| d.iface.as_str()),
+            Some("wlan1")
+        );
+    }
+
+    #[test]
+    fn hiding_empty_known_section_moves_focus_to_non_empty_section() {
+        let mut app = test_app();
+        app.wifi_focus = WifiFocus::KnownNetworks;
+        app.show_unavailable_known_networks = true;
+        app.wifi.unavailable_known_networks = vec![WifiNetwork {
+            ssid: "office".into(),
+            security: "WPA2".into(),
+            signal: "-".into(),
+            connected: false,
+            hidden: Some(false),
+            autoconnect: Some(true),
+            available: false,
+        }];
+        app.wifi.new_networks = vec![WifiNetwork {
+            ssid: "guest".into(),
+            security: "WPA2".into(),
+            signal: "80%".into(),
+            connected: false,
+            hidden: None,
+            autoconnect: None,
+            available: true,
+        }];
+
+        app.toggle_known_show_all();
+
+        assert_eq!(app.wifi_focus, WifiFocus::NewNetworks);
+    }
+
+    #[test]
+    fn dismiss_wifi_overlays_without_adapter_closes_transient_prompts() {
+        let mut app = test_app();
+        app.hidden_connect_prompt = true;
+        app.wifi_auth_prompt = Some(WifiAuthPrompt::manual_passphrase("ssid".into()));
+        app.wifi_enterprise_prompt = Some(WifiEnterprisePrompt::new("corp".into()));
+        app.wifi_ap_prompt_open = true;
+
+        app.dismiss_wifi_overlays_without_adapter();
+
+        assert!(!app.hidden_connect_prompt);
+        assert!(app.wifi_auth_prompt.is_none());
+        assert!(app.wifi_enterprise_prompt.is_none());
+        assert!(!app.wifi_ap_prompt_open);
+        assert!(
+            app.has_recent_toast_message("Closed Wi-Fi prompts because no adapter is available.")
+        );
     }
 }
