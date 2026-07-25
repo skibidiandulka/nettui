@@ -62,6 +62,29 @@ yay -S nettui
 yay -S nettui-bin
 ```
 
+### Other Linux distributions
+
+`nettui` is not Arch-specific — it runs on any distribution using the `iwd` + `systemd-networkd` stack. Install the binary with `cargo install nettui` (see above).
+
+Because `nettui` drives `iwd`, that stack has to be your active network backend. Switch to it carefully — tearing down your current network manager before the replacement works can leave you offline:
+
+1. Install `iwd` (and `systemd`, which provides `systemd-networkd`/`resolved`) with your distro's package manager.
+2. Enable it and confirm it actually works **before** touching anything else:
+
+   ```bash
+   sudo systemctl enable --now iwd systemd-networkd systemd-resolved
+   systemctl status iwd systemd-networkd
+   ```
+
+   Check the `iwd` and `systemd-networkd` documentation if you need to enable built-in network configuration (e.g. DHCP).
+3. Only once `iwd` is up and can connect, disable any overlapping manager so they don't fight:
+
+   ```bash
+   sudo systemctl disable --now NetworkManager wpa_supplicant
+   ```
+
+Config is created on first launch at `~/.config/nettui/keybinds.toml`. Nerd Fonts are recommended for the full UI.
+
 ## 🤝 Contributing
 
 See `CONTRIBUTING.md` for development setup, required checks, and pull request expectations.
@@ -99,14 +122,19 @@ Verify:
 sed -n '1,120p' ~/.local/share/omarchy/bin/omarchy-launch-wifi
 ```
 
-No fixed-size Hyprland rule is required, and `nettui` no longer enforces a hard minimum terminal size.
-
-If you previously added one, remove it with:
+By default, Omarchy only floats the window classes shipped in its own list, so `nettui` opens **tiled**. To make it float and center like `impala` and the other Omarchy TUIs, add this rule to the personal section at the bottom of `~/.config/hypr/hyprland.conf`:
 
 ```bash
-sed -i '/match:class org\\.omarchy\\.nettui/d' ~/.config/hypr/apps/system.conf
+windowrule = tag +floating-window, match:class org.omarchy.nettui
+```
+
+Then reload:
+
+```bash
 hyprctl reload
 ```
+
+`nettui` no longer enforces a hard minimum terminal size, so no fixed-size rule is needed — the `floating-window` tag already applies Omarchy's standard float, center, and size.
 
 ## ⌨️ Controls
 
