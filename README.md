@@ -64,14 +64,24 @@ yay -S nettui-bin
 
 ### Other Linux distributions
 
-`nettui` is not Arch-specific — it runs on any distribution using the `iwd` + `systemd-networkd` stack. Install the binary with `cargo install nettui` (see above), then make sure that stack is the active network manager:
+`nettui` is not Arch-specific — it runs on any distribution using the `iwd` + `systemd-networkd` stack. Install the binary with `cargo install nettui` (see above).
 
-```bash
-# Use iwd for Wi-Fi and systemd-networkd for addressing.
-# Disable overlapping managers first (skip any that aren't installed).
-sudo systemctl disable --now NetworkManager wpa_supplicant 2>/dev/null || true
-sudo systemctl enable --now iwd systemd-networkd systemd-resolved
-```
+Because `nettui` drives `iwd`, that stack has to be your active network backend. Switch to it carefully — tearing down your current network manager before the replacement works can leave you offline:
+
+1. Install `iwd` (and `systemd`, which provides `systemd-networkd`/`resolved`) with your distro's package manager.
+2. Enable it and confirm it actually works **before** touching anything else:
+
+   ```bash
+   sudo systemctl enable --now iwd systemd-networkd systemd-resolved
+   systemctl status iwd systemd-networkd
+   ```
+
+   Check the `iwd` and `systemd-networkd` documentation if you need to enable built-in network configuration (e.g. DHCP).
+3. Only once `iwd` is up and can connect, disable any overlapping manager so they don't fight:
+
+   ```bash
+   sudo systemctl disable --now NetworkManager wpa_supplicant
+   ```
 
 Config is created on first launch at `~/.config/nettui/keybinds.toml`. Nerd Fonts are recommended for the full UI.
 
