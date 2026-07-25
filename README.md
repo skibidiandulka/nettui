@@ -62,6 +62,19 @@ yay -S nettui
 yay -S nettui-bin
 ```
 
+### Other Linux distributions
+
+`nettui` is not Arch-specific — it runs on any distribution using the `iwd` + `systemd-networkd` stack. Install the binary with `cargo install nettui` (see above), then make sure that stack is the active network manager:
+
+```bash
+# Use iwd for Wi-Fi and systemd-networkd for addressing.
+# Disable overlapping managers first (skip any that aren't installed).
+sudo systemctl disable --now NetworkManager wpa_supplicant 2>/dev/null || true
+sudo systemctl enable --now iwd systemd-networkd systemd-resolved
+```
+
+Config is created on first launch at `~/.config/nettui/keybinds.toml`. Nerd Fonts are recommended for the full UI.
+
 ## 🤝 Contributing
 
 See `CONTRIBUTING.md` for development setup, required checks, and pull request expectations.
@@ -99,14 +112,19 @@ Verify:
 sed -n '1,120p' ~/.local/share/omarchy/bin/omarchy-launch-wifi
 ```
 
-No fixed-size Hyprland rule is required, and `nettui` no longer enforces a hard minimum terminal size.
-
-If you previously added one, remove it with:
+By default, Omarchy only floats the window classes shipped in its own list, so `nettui` opens **tiled**. To make it float and center like `impala` and the other Omarchy TUIs, add this rule to the personal section at the bottom of `~/.config/hypr/hyprland.conf`:
 
 ```bash
-sed -i '/match:class org\\.omarchy\\.nettui/d' ~/.config/hypr/apps/system.conf
+windowrule = tag +floating-window, match:class org.omarchy.nettui
+```
+
+Then reload:
+
+```bash
 hyprctl reload
 ```
+
+`nettui` no longer enforces a hard minimum terminal size, so no fixed-size rule is needed — the `floating-window` tag already applies Omarchy's standard float, center, and size.
 
 ## ⌨️ Controls
 
