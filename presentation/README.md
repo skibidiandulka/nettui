@@ -1,7 +1,9 @@
 # Prezentace: Výroková logika
 
 Samostatný HTML soubor `vyrokova-logika.html` — stačí ho otevřít v prohlížeči
-(dvojklik), nic dalšího není potřeba. Žádné knihovny, žádné připojení k internetu.
+(dvojklik), nic dalšího není potřeba. Žádné knihovny, žádné připojení k internetu:
+i písma (Archivo, IBM Plex Sans a IBM Plex Mono, licence SIL OFL 1.1) jsou vložená
+přímo v souboru, takže prezentace vypadá stejně i na školním počítači bez sítě.
 
 ## Ovládání
 
@@ -33,3 +35,12 @@ Na dotykových zařízeních se listuje přejetím prstem doleva/doprava.
 
 Na každém interaktivním snímku se u výroků zobrazuje jejich pravdivostní hodnota
 (0/1), v tabulce se zvýrazňuje aktuální řádek a pod ní je slovní vyhodnocení.
+
+## Vzhled
+
+Prezentace je vysázená jako technický výkres: modrotiskový podklad s milimetrovou
+sítí, rámeček listu a popisové pole dole. Schémata používají skutečné referenční
+označení součástek (GB1 baterie, S1/S2 vypínače, HL1 žárovka) a u konjunkce
+a disjunkce je i značka logického hradla podle ČSN EN 60617-12. Jantarová je
+v celé prezentaci jediná výrazná barva a znamená vždy totéž — „teče proud“,
+tedy pravdivostní hodnotu 1.
