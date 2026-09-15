@@ -19,6 +19,10 @@ Na telefonu a tabletu se listuje třemi způsoby: přejetím prstem, tlačítky 
 v dolních rozích nebo ťuknutím na volnou plochu snímku (interaktivní části se tím
 nespustí).
 
+Každý snímek se vejde na obrazovku bez rolování — od projektoru 4:3 přes notebook
+až po telefon naležato. Rozvržení se na úzkých displejích přeskládá a co se pak
+ještě nevejde na výšku, prezentace sama zmenší.
+
 ## Obsah (6 snímků)
 
 Na plátně je záměrně jen to, co má smysl ukazovat — výklad, definice a pravdivostní
@@ -29,7 +33,7 @@ tabulka jdou na tabuli.
 3. **Disjunkce** — paralelní zapojení, proud teče jen sepnutou větví
 4. **Implikace** — „Pokud přineseš mléko, bude buchta.“
 5. **Ekvivalence** — semafor a chodec na přechodu
-6. Souhrnná tabulka — znak, jak se říká nahlas a kdy formule platí
+6. Souhrnná tabulka — A, B a k nim konjunkce, disjunkce, implikace a ekvivalence
 7. Závěr
 
 Na každém snímku se u výroků zobrazuje jejich pravdivostní hodnota (0/1), vedle
