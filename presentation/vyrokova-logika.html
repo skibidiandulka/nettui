@@ -281,6 +281,12 @@ p.keys{border:0; padding:0; display:block; line-height:2.1; letter-spacing:.12em
 .gatecap{font-family:var(--mono); font-weight:500; font-size:10.5px; letter-spacing:.14em;
          text-transform:uppercase; color:var(--ink-3); margin:0; max-width:24ch; line-height:1.8}
 .card p{max-width:58ch}
+/* schéma je teď hlavní obsah snímku — šířku vážeme na výšku okna, ať se vše vejde */
+.wrap-demo{max-width:min(1040px, 92vh)}
+.wrap-demo h2{font-size:clamp(23px,2.9vw,38px); margin-bottom:12px}
+.wrap-demo .drawing{margin-top:4px}
+.wrap-demo .chips{margin:16px 0 0}
+.wrap-demo .verdict{margin-top:12px}
 .note{border:1px solid var(--rule); border-left:3px solid var(--live); background:var(--panel);
       padding:14px 18px; font-size:clamp(15px,1.5vw,18px); line-height:1.55; color:var(--text)}
 .note b{color:var(--ink)}
@@ -330,128 +336,21 @@ table.ref td.rd{font-style:italic}
   <div class="wrap" style="width:100%">
     <div class="kicker">Matematika · logika</div>
     <h1>Výroková logika</h1>
-    <p class="lead" style="font-size:clamp(17px,2.2vw,26px);max-width:800px">
-      Konjunkce, disjunkce, implikace a ekvivalence — s interaktivními příklady,
-      které si můžete přímo naklikat.
-    </p>
     <div class="ops">
       <div class="op"><span class="opg">∧</span><span class="opn">Konjunkce</span></div>
       <div class="op"><span class="opg">∨</span><span class="opn">Disjunkce</span></div>
       <div class="op"><span class="opg">⇒</span><span class="opn">Implikace</span></div>
       <div class="op"><span class="opg">⇔</span><span class="opn">Ekvivalence</span></div>
     </div>
-    <p class="minilabel">Ovládání</p>
-    <div class="keysgrid">
-      <span><kbd>→</kbd> <kbd>Mezerník</kbd> další snímek</span>
-      <span><kbd>←</kbd> zpět</span>
-      <span><kbd>F</kbd> celá obrazovka</span>
-      <span><kbd>Home</kbd> / <kbd>End</kbd> první / poslední</span>
-      <span><kbd>A</kbd> / <kbd>B</kbd> přepnutí výroku</span>
-    </div>
   </div>
 </section>
 
 <!-- 2 -->
 <section class="slide">
-  <div class="wrap">
-    <div class="kicker">Základ</div>
-    <h2>Co je výrok?</h2>
-    <p class="lead">Výrok je každé tvrzení, o kterém má smysl říct, že je <b class="accent">pravdivé (1)</b>, nebo <b style="color:var(--fault)">nepravdivé (0)</b>.</p>
-    <div class="grid g2" style="margin-top:18px">
-      <div class="card">
-        <h3>✓ Výroky</h3>
-        <ul>
-          <li>„Praha je hlavní město ČR.“ → 1</li>
-          <li>„5 &gt; 9“ → 0</li>
-          <li>„Venku prší.“ → 1 nebo 0</li>
-        </ul>
-      </div>
-      <div class="card">
-        <h3>✗ Nejsou výroky</h3>
-        <ul>
-          <li>„Kolik je hodin?“ (otázka)</li>
-          <li>„Zavři dveře!“ (rozkaz)</li>
-          <li>„x + 1 = 7“ (neznáme x)</li>
-        </ul>
-      </div>
-    </div>
-    <p style="margin-top:18px" class="lead">Výroky značíme písmeny <span class="sym">A</span>, <span class="sym">B</span>, <span class="sym">C</span>… a spojujeme je <b>logickými spojkami</b>.</p>
-  </div>
-</section>
-
-<!-- 3 -->
-<section class="slide">
-  <div class="wrap">
-    <div class="kicker">Přehled</div>
-    <h2>Logické spojky</h2>
-    <div class="grid g2" style="margin-top:18px">
-      <div class="card"><h3 class="accent">Konjunkce &nbsp;<span class="sym">A ∧ B</span></h3><p style="margin:0">„A <b>a zároveň</b> B“ — pravdivá, jen když platí <b>obojí</b>.</p></div>
-      <div class="card"><h3 class="accent">Disjunkce &nbsp;<span class="sym">A ∨ B</span></h3><p style="margin:0">„A <b>nebo</b> B“ — pravdivá, když platí <b>aspoň jedno</b>.</p></div>
-      <div class="card"><h3 class="accent">Implikace &nbsp;<span class="sym">A ⇒ B</span></h3><p style="margin:0">„<b>Když</b> A, <b>pak</b> B“ — nepravdivá jen při A = 1 a B = 0.</p></div>
-      <div class="card"><h3 class="accent">Ekvivalence &nbsp;<span class="sym">A ⇔ B</span></h3><p style="margin:0">„A <b>právě tehdy, když</b> B“ — pravdivá, když mají <b>stejnou</b> hodnotu.</p></div>
-    </div>
-    <div class="card" style="margin-top:18px">
-      <h3>Negace &nbsp;<span class="sym">¬A</span></h3>
-      <p style="margin:0 0 10px">Otočí pravdivostní hodnotu výroku na opačnou.</p>
-      <div class="negrow">
-        <div class="chips">
-          <div class="chip"><b>A</b> <span class="val is1" id="neg-a">1</span></div>
-          <div class="chip"><b>¬A</b> <span class="val is0" id="neg-na">0</span></div>
-        </div>
-        <button class="tgl" id="neg-btn">Přepnout A</button>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- 4 -->
-<section class="slide">
-  <div class="wrap">
-    <div class="kicker">Konjunkce</div>
-    <h2>Konjunkce <span class="sym accent">A ∧ B</span></h2>
-    <p class="lead">Čteme „A <b>a zároveň</b> B“. Je pravdivá <b>pouze tehdy</b>, když jsou pravdivé oba výroky.</p>
-    <div class="grid g2" style="margin-top:18px">
-      <div class="card">
-        <h3>Pravdivostní tabulka</h3>
-        <table class="tt">
-          <tr><th>A</th><th>B</th><th>A ∧ B</th></tr>
-          <tr><td class="v0">0</td><td class="v0">0</td><td class="res v0">0</td></tr>
-          <tr><td class="v0">0</td><td class="v1">1</td><td class="res v0">0</td></tr>
-          <tr><td class="v1">1</td><td class="v0">0</td><td class="res v0">0</td></tr>
-          <tr><td class="v1">1</td><td class="v1">1</td><td class="res v1">1</td></tr>
-        </table>
-        <div class="gaterow">
-          <svg class="gatefig" viewBox="0 0 250 120" aria-hidden="true">
-            <line class="gate" x1="8" y1="42" x2="62" y2="42"/>
-            <line class="gate" x1="8" y1="78" x2="62" y2="78"/>
-            <rect class="gate" x="62" y="20" width="82" height="80"/>
-            <text class="gate-t" x="103" y="69">&amp;</text>
-            <line class="gate" x1="144" y1="60" x2="188" y2="60"/>
-            <text class="gate-p" x="10" y="34">A</text>
-            <text class="gate-p" x="10" y="70">B</text>
-            <text class="gate-p" x="150" y="52">A ∧ B</text>
-          </svg>
-          <p class="gatecap">Značka hradla podle ČSN EN 60617-12</p>
-        </div>
-      </div>
-      <div class="card">
-        <h3>Příklad ze života</h3>
-        <p>„Mám <b>hotovost</b> ∧ obchod má <b>otevřeno</b>.“</p>
-        <p style="margin:0">Nakoupím, jen když platí <b>obě</b> podmínky najednou. Stačí, aby jedna selhala, a celý výrok je nepravdivý.</p>
-        <p style="margin-top:14px" class="lead">V elektrotechnice tomu odpovídá <b class="accent">sériové zapojení</b> — na dalším snímku.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- 5 -->
-<section class="slide">
-  <div class="wrap">
+  <div class="wrap wrap-demo">
     <div class="kicker">Konjunkce · interaktivně</div>
     <h2>Sériové zapojení = <span class="sym accent">A ∧ B</span></h2>
-    <p class="lead" style="margin-bottom:6px">Klikni na vypínače. Žárovka se rozsvítí, jen když jsou sepnuté <b>oba</b> — proud musí projít celým obvodem.</p>
-    <div class="grid g2" style="grid-template-columns:1.55fr 1fr;align-items:start">
-      <div class="drawing">
+    <div class="drawing">
         <svg class="scene" viewBox="0 0 760 340" role="img" aria-label="Sériové zapojení dvou vypínačů">
           <defs>
             <radialGradient id="glowA"><stop offset="0%" stop-color="var(--live-bright)" stop-opacity=".75"/><stop offset="100%" stop-color="var(--live-bright)" stop-opacity="0"/></radialGradient>
@@ -499,75 +398,19 @@ table.ref td.rd{font-style:italic}
         </svg>
         <p class="hint"><span><b>Schéma 01 · Sériové zapojení</b></span><span>Klikni na vypínač A nebo B &nbsp;·&nbsp; přepni <kbd>A</kbd> <kbd>B</kbd></span></p>
       </div>
-      <div>
-        <div class="chips" style="margin-top:0">
+    <div class="chips">
           <div class="chip"><b>A</b> — sepnuto <span class="val is1" id="ser-va">1</span></div>
           <div class="chip"><b>B</b> — sepnuto <span class="val is1" id="ser-vb">1</span></div>
           <div class="chip"><b>A ∧ B</b> <span class="val is1" id="ser-vr">1</span></div>
         </div>
-        <div class="card" style="padding:12px 14px">
-          <table class="tt" id="ser-tt">
-            <tr><th>A</th><th>B</th><th>A ∧ B</th><th>ŽÁROVKA</th></tr>
-            <tr data-row="00"><td class="v0">0</td><td class="v0">0</td><td class="res v0">0</td><td>nesvítí</td></tr>
-            <tr data-row="01"><td class="v0">0</td><td class="v1">1</td><td class="res v0">0</td><td>nesvítí</td></tr>
-            <tr data-row="10"><td class="v1">1</td><td class="v0">0</td><td class="res v0">0</td><td>nesvítí</td></tr>
-            <tr data-row="11"><td class="v1">1</td><td class="v1">1</td><td class="res v1">1</td><td>svítí</td></tr>
-          </table>
-        </div>
-        <div class="verdict t" id="ser-verdict"><span class="res">Svítí.</span> Oba vypínače jsou sepnuté, obvod je uzavřený.</div>
-      </div>
-    </div>
+    <div class="verdict t" id="ser-verdict"><span class="res">Svítí.</span> Oba vypínače jsou sepnuté.</div>
   </div>
 </section>
-
-<!-- 6 -->
 <section class="slide">
-  <div class="wrap">
-    <div class="kicker">Disjunkce</div>
-    <h2>Disjunkce <span class="sym accent">A ∨ B</span></h2>
-    <p class="lead">Čteme „A <b>nebo</b> B“. Je nepravdivá <b>pouze tehdy</b>, když jsou nepravdivé oba výroky. Jde o <b>nevylučovací</b> „nebo“ — platit mohou i obě zároveň.</p>
-    <div class="grid g2" style="margin-top:18px">
-      <div class="card">
-        <h3>Pravdivostní tabulka</h3>
-        <table class="tt">
-          <tr><th>A</th><th>B</th><th>A ∨ B</th></tr>
-          <tr><td class="v0">0</td><td class="v0">0</td><td class="res v0">0</td></tr>
-          <tr><td class="v0">0</td><td class="v1">1</td><td class="res v1">1</td></tr>
-          <tr><td class="v1">1</td><td class="v0">0</td><td class="res v1">1</td></tr>
-          <tr><td class="v1">1</td><td class="v1">1</td><td class="res v1">1</td></tr>
-        </table>
-        <div class="gaterow">
-          <svg class="gatefig" viewBox="0 0 250 120" aria-hidden="true">
-            <line class="gate" x1="8" y1="42" x2="62" y2="42"/>
-            <line class="gate" x1="8" y1="78" x2="62" y2="78"/>
-            <rect class="gate" x="62" y="20" width="82" height="80"/>
-            <text class="gate-t" x="103" y="69">≥1</text>
-            <line class="gate" x1="144" y1="60" x2="188" y2="60"/>
-            <text class="gate-p" x="10" y="34">A</text>
-            <text class="gate-p" x="10" y="70">B</text>
-            <text class="gate-p" x="150" y="52">A ∨ B</text>
-          </svg>
-          <p class="gatecap">Značka hradla podle ČSN EN 60617-12</p>
-        </div>
-      </div>
-      <div class="card">
-        <h3>Příklad ze života</h3>
-        <p>„Přijedu <b>autem</b> ∨ přijedu <b>vlakem</b>.“</p>
-        <p style="margin:0">Slib splním, pokud dorazím aspoň jedním způsobem. Porušen je jen tehdy, když nepřijedu vůbec.</p>
-        <p style="margin-top:14px" class="lead">V elektrotechnice tomu odpovídá <b class="accent">paralelní zapojení</b> — na dalším snímku.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- 7 -->
-<section class="slide">
-  <div class="wrap">
+  <div class="wrap wrap-demo">
     <div class="kicker">Disjunkce · interaktivně</div>
     <h2>Paralelní zapojení = <span class="sym accent">A ∨ B</span></h2>
-    <p class="lead" style="margin-bottom:6px">Klikni na vypínače. Stačí sepnout <b>kterýkoli jeden</b> — proud si najde cestu a žárovka svítí.</p>
-    <div class="grid g2" style="grid-template-columns:1.55fr 1fr;align-items:start">
-      <div class="drawing">
+    <div class="drawing">
         <svg class="scene" viewBox="0 0 760 360" role="img" aria-label="Paralelní zapojení dvou vypínačů">
           <defs>
             <radialGradient id="glowB"><stop offset="0%" stop-color="var(--live-bright)" stop-opacity=".75"/><stop offset="100%" stop-color="var(--live-bright)" stop-opacity="0"/></radialGradient>
@@ -626,64 +469,19 @@ table.ref td.rd{font-style:italic}
         </svg>
         <p class="hint"><span><b>Schéma 02 · Paralelní zapojení</b></span><span>Klikni na vypínač A nebo B &nbsp;·&nbsp; přepni <kbd>A</kbd> <kbd>B</kbd></span></p>
       </div>
-      <div>
-        <div class="chips" style="margin-top:0">
+    <div class="chips">
           <div class="chip"><b>A</b> — sepnuto <span class="val is1" id="par-va">1</span></div>
           <div class="chip"><b>B</b> — sepnuto <span class="val is1" id="par-vb">1</span></div>
           <div class="chip"><b>A ∨ B</b> <span class="val is1" id="par-vr">1</span></div>
         </div>
-        <div class="card" style="padding:12px 14px">
-          <table class="tt" id="par-tt">
-            <tr><th>A</th><th>B</th><th>A ∨ B</th><th>ŽÁROVKA</th></tr>
-            <tr data-row="00"><td class="v0">0</td><td class="v0">0</td><td class="res v0">0</td><td>nesvítí</td></tr>
-            <tr data-row="01"><td class="v0">0</td><td class="v1">1</td><td class="res v1">1</td><td>svítí</td></tr>
-            <tr data-row="10"><td class="v1">1</td><td class="v0">0</td><td class="res v1">1</td><td>svítí</td></tr>
-            <tr data-row="11"><td class="v1">1</td><td class="v1">1</td><td class="res v1">1</td><td>svítí</td></tr>
-          </table>
-        </div>
-        <div class="verdict t" id="par-verdict"><span class="res">Svítí.</span> Proud teče oběma větvemi.</div>
-      </div>
-    </div>
+    <div class="verdict t" id="par-verdict"><span class="res">Svítí.</span> Proud teče oběma větvemi.</div>
   </div>
 </section>
-
-<!-- 8 -->
 <section class="slide">
-  <div class="wrap">
-    <div class="kicker">Implikace</div>
-    <h2>Implikace <span class="sym accent">A ⇒ B</span></h2>
-    <p class="lead">Čteme „<b>jestliže</b> A, <b>pak</b> B“. A je <b>předpoklad</b>, B je <b>závěr</b>. Implikace je nepravdivá v <b>jediném případě</b>: předpoklad platí, ale závěr ne.</p>
-    <div class="grid g2" style="margin-top:18px">
-      <div class="card">
-        <h3>Pravdivostní tabulka</h3>
-        <table class="tt">
-          <tr><th>A</th><th>B</th><th>A ⇒ B</th></tr>
-          <tr><td class="v0">0</td><td class="v0">0</td><td class="res v1">1</td></tr>
-          <tr><td class="v0">0</td><td class="v1">1</td><td class="res v1">1</td></tr>
-          <tr><td class="v1">1</td><td class="v0">0</td><td class="res v0">0</td></tr>
-          <tr><td class="v1">1</td><td class="v1">1</td><td class="res v1">1</td></tr>
-        </table>
-      </div>
-      <div class="card">
-        <h3>Pozor — časté nedorozumění</h3>
-        <p>Když <b>předpoklad neplatí</b> (A = 0), je implikace <b>vždy pravdivá</b> — slib nebyl porušen, protože nenastala situace, které se týkal.</p>
-        <p style="margin:0">Implikace <b>neznamená příčinu</b>, jen říká, co se nesmí stát: A = 1 a zároveň B = 0.</p>
-        <p style="margin-top:14px" class="lead">Příklad: <b class="accent">„Přineseš-li mléko, bude buchta.“</b></p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- 9 -->
-<section class="slide">
-  <div class="wrap">
+  <div class="wrap wrap-demo">
     <div class="kicker">Implikace · interaktivně</div>
     <h2>„Pokud přineseš mléko, bude buchta.“</h2>
-    <p class="lead" style="margin-bottom:6px">
-      <b>A</b> = přineseš mléko &nbsp;·&nbsp; <b>B</b> = bude buchta &nbsp;·&nbsp; zkoumáme <span class="sym accent">A ⇒ B</span>
-    </p>
-    <div class="grid g2" style="grid-template-columns:1.55fr 1fr;align-items:start">
-      <div class="drawing">
+    <div class="drawing">
         <svg class="scene" viewBox="0 0 760 320" role="img" aria-label="Mléko a buchta">
           <g class="obj" id="imp-milk">
             <g class="art" fill="none" stroke="var(--ink)" stroke-width="3.5" stroke-linejoin="round">
@@ -713,104 +511,19 @@ table.ref td.rd{font-style:italic}
         </svg>
         <p class="hint"><span><b>Situace 03 · Slib</b></span><span>Klikni na mléko nebo na buchtu &nbsp;·&nbsp; přepni <kbd>A</kbd> <kbd>B</kbd></span></p>
       </div>
-      <div>
-        <div class="chips" style="margin-top:0">
+    <div class="chips">
           <div class="chip"><b>A</b> — mléko <span class="val is1" id="imp-va">1</span></div>
           <div class="chip"><b>B</b> — buchta <span class="val is1" id="imp-vb">1</span></div>
           <div class="chip"><b>A ⇒ B</b> <span class="val is1" id="imp-vr">1</span></div>
         </div>
-        <div class="card" style="padding:12px 14px">
-          <table class="tt" id="imp-tt">
-            <tr><th>A</th><th>B</th><th>A ⇒ B</th><th>situace</th></tr>
-            <tr data-row="00"><td class="v0">0</td><td class="v0">0</td><td class="res v1">1</td><td>slib platí</td></tr>
-            <tr data-row="01"><td class="v0">0</td><td class="v1">1</td><td class="res v1">1</td><td>slib platí</td></tr>
-            <tr data-row="10"><td class="v1">1</td><td class="v0">0</td><td class="res v0">0</td><td>slib porušen</td></tr>
-            <tr data-row="11"><td class="v1">1</td><td class="v1">1</td><td class="res v1">1</td><td>slib splněn</td></tr>
-          </table>
-        </div>
-        <div class="verdict t" id="imp-verdict"><span class="res">Pravda.</span> Mléko dorazilo a buchta je na stole — slib byl splněn.</div>
-      </div>
-    </div>
+    <div class="verdict t" id="imp-verdict"><span class="res">Pravda.</span> Mléko dorazilo a buchta je na stole — slib byl splněn.</div>
   </div>
 </section>
-
-<!-- implikace: další příklady -->
 <section class="slide">
-  <div class="wrap">
-    <div class="kicker">Implikace · další příklady</div>
-    <h2>Test: „Vadí nám to?“</h2>
-    <p class="lead">U implikace se ptáme na jedinou věc: <b>stalo se něco, co by slib porušilo?</b>
-      Porušit ho jde jen jedním způsobem — předpoklad platí a závěr ne. Ve všech ostatních
-      případech odpovídáme „nevadí“, a výrok je tedy pravdivý.</p>
-    <div class="grid g2" style="margin-top:18px">
-      <div class="card">
-        <p class="exq">„Když přineseš mléko, bude buchta.“</p>
-        <p class="exv"><b>A</b> přineseš mléko · <b>B</b> bude buchta</p>
-        <p class="exa">Mléko jsi nepřinesl, ale buchta na stole je. Vadí nám, že je buchta?
-          Ne — nikdo neslíbil, že <i>bez</i> mléka buchta nebude. <span class="exr">A ⇒ B = 1</span></p>
-      </div>
-      <div class="card">
-        <p class="exq">„Když bude svítit slunce, půjdeme na výlet.“</p>
-        <p class="exv"><b>A</b> svítí slunce · <b>B</b> jdeme na výlet</p>
-        <p class="exa">Bylo zataženo a na výlet jsme šli stejně — nevadí, o zataženém dni slib nic
-          neříkal <span class="exr">= 1</span>. Slunce svítilo a nešli jsme — <b>to</b> je porušený
-          slib <span class="exr">= 0</span>.</p>
-      </div>
-      <div class="card">
-        <p class="exq">„Je-li číslo dělitelné šesti, je dělitelné třemi.“</p>
-        <p class="exv"><b>A</b> dělitelné 6 · <b>B</b> dělitelné 3</p>
-        <p class="exa">Zkus najít číslo, které je dělitelné šesti a není třemi. Nenajdeš — proto
-          implikace platí pro každé číslo. <span class="exr">A ⇒ B = 1</span></p>
-      </div>
-      <div class="card">
-        <p class="exq">„Když 2 + 2 = 5, jsem papež.“</p>
-        <p class="exv"><b>A</b> 2 + 2 = 5 · <b>B</b> jsem papež</p>
-        <p class="exa">Předpoklad neplatí, takže situace, které se slib týkal, nikdy nenastane a nejde
-          ho porušit. Celý výrok je <b>pravdivý</b> — z nepravdy plyne cokoli.
-          <span class="exr">A ⇒ B = 1</span></p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- 10 -->
-<section class="slide">
-  <div class="wrap">
-    <div class="kicker">Ekvivalence</div>
-    <h2>Ekvivalence <span class="sym accent">A ⇔ B</span></h2>
-    <p class="lead">Čteme „A <b>právě tehdy, když</b> B“. Je pravdivá, když mají oba výroky <b>stejnou</b> pravdivostní hodnotu — obě platí, nebo obě neplatí.</p>
-    <div class="grid g2" style="margin-top:18px">
-      <div class="card">
-        <h3>Pravdivostní tabulka</h3>
-        <table class="tt">
-          <tr><th>A</th><th>B</th><th>A ⇔ B</th></tr>
-          <tr><td class="v0">0</td><td class="v0">0</td><td class="res v1">1</td></tr>
-          <tr><td class="v0">0</td><td class="v1">1</td><td class="res v0">0</td></tr>
-          <tr><td class="v1">1</td><td class="v0">0</td><td class="res v0">0</td></tr>
-          <tr><td class="v1">1</td><td class="v1">1</td><td class="res v1">1</td></tr>
-        </table>
-      </div>
-      <div class="card">
-        <h3>Dobré vědět</h3>
-        <p>Ekvivalence je vlastně <b>implikace v obou směrech</b>:</p>
-        <p class="formula"><span class="sym">(A ⇒ B) ∧ (B ⇒ A)</span></p>
-        <p style="margin:0">V matematice odpovídá formulaci „<b>nutná a postačující podmínka</b>“.</p>
-        <p style="margin-top:14px" class="lead">Příklad: <b class="accent">„Chodec jde právě tehdy, když svítí zelená.“</b></p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- 11 -->
-<section class="slide">
-  <div class="wrap">
+  <div class="wrap wrap-demo">
     <div class="kicker">Ekvivalence · interaktivně</div>
     <h2>„Chodec jde právě tehdy, když svítí zelená.“</h2>
-    <p class="lead" style="margin-bottom:6px">
-      <b>A</b> = svítí zelená &nbsp;·&nbsp; <b>B</b> = chodec přechází &nbsp;·&nbsp; zkoumáme <span class="sym accent">A ⇔ B</span>
-    </p>
-    <div class="grid g2" style="grid-template-columns:1.55fr 1fr;align-items:start">
-      <div class="drawing">
+    <div class="drawing">
         <svg class="scene" viewBox="0 0 760 340" id="eq-scene" role="img" aria-label="Semafor a chodec na přechodu">
           <rect x="250" y="20" width="420" height="300" fill="var(--road)"/>
           <line x1="250" y1="20" x2="250" y2="320" stroke="var(--line)" stroke-width="3"/>
@@ -844,132 +557,17 @@ table.ref td.rd{font-style:italic}
         </svg>
         <p class="hint"><span><b>Situace 04 · Přechod</b></span><span>Klikni na semafor nebo na chodce &nbsp;·&nbsp; přepni <kbd>A</kbd> <kbd>B</kbd></span></p>
       </div>
-      <div>
-        <div class="chips" style="margin-top:0">
+    <div class="chips">
           <div class="chip"><b>A</b> — zelená <span class="val is1" id="eq-va">1</span></div>
           <div class="chip"><b>B</b> — jde <span class="val is1" id="eq-vb">1</span></div>
           <div class="chip"><b>A ⇔ B</b> <span class="val is1" id="eq-vr">1</span></div>
         </div>
-        <div class="card" style="padding:12px 14px">
-          <table class="tt" id="eq-tt">
-            <tr><th>A</th><th>B</th><th>A ⇔ B</th><th>situace</th></tr>
-            <tr data-row="00"><td class="v0">0</td><td class="v0">0</td><td class="res v1">1</td><td>červená, stojí</td></tr>
-            <tr data-row="01"><td class="v0">0</td><td class="v1">1</td><td class="res v0">0</td><td>červená, jde ⚠</td></tr>
-            <tr data-row="10"><td class="v1">1</td><td class="v0">0</td><td class="res v0">0</td><td>zelená, stojí</td></tr>
-            <tr data-row="11"><td class="v1">1</td><td class="v1">1</td><td class="res v1">1</td><td>zelená, jde</td></tr>
-          </table>
-        </div>
-        <div class="verdict t" id="eq-verdict"><span class="res">Pravda.</span> Svítí zelená a chodec jde — obě hodnoty se shodují.</div>
-      </div>
-    </div>
+    <div class="verdict t" id="eq-verdict"><span class="res">Pravda.</span> Svítí zelená a chodec jde — obě hodnoty se shodují.</div>
   </div>
 </section>
-
-<!-- ekvivalence: další příklady -->
-<section class="slide">
-  <div class="wrap">
-    <div class="kicker">Ekvivalence · další příklady</div>
-    <h2>Test: „Jde jedno bez druhého?“</h2>
-    <p class="lead">Ekvivalence platí jen tehdy, když obě věty chodí <b>vždycky spolu</b>. Stačí najít
-      jediný případ, kdy platí jedna a druhá ne, a ekvivalence padá — i když implikace jedním
-      směrem klidně dál platí.</p>
-    <div class="grid g2" style="margin-top:18px">
-      <div class="card">
-        <p class="exq">„Žárovka svítí právě tehdy, když je vypínač sepnutý.“</p>
-        <p class="exv"><b>A</b> svítí · <b>B</b> sepnuto</p>
-        <p class="exa">Jedno bez druhého nenastane ani v jednom směru. <span class="exr">A ⇔ B = 1</span></p>
-      </div>
-      <div class="card">
-        <p class="exq">„Číslo je sudé právě tehdy, když končí 0, 2, 4, 6 nebo 8.“</p>
-        <p class="exv"><b>A</b> sudé · <b>B</b> končí sudou číslicí</p>
-        <p class="exa">Platí to oběma směry, proto je to definice, ne jen pravidlo.
-          <span class="exr">A ⇔ B = 1</span></p>
-      </div>
-      <div class="card">
-        <p class="exq">„Prší právě tehdy, když je mokrý chodník.“</p>
-        <p class="exv"><b>A</b> prší · <b>B</b> mokrý chodník</p>
-        <p class="exa">Chodník může být mokrý od kropicího vozu — jeden směr selže.
-          <span class="exr">A ⇔ B = 0</span>, ale „prší ⇒ mokrý chodník“ pořád platí.</p>
-      </div>
-      <div class="card">
-        <p class="exq">„Zkoušku uděláš právě tehdy, když získáš aspoň 60 bodů.“</p>
-        <p class="exv"><b>A</b> uděláš zkoušku · <b>B</b> aspoň 60 bodů</p>
-        <p class="exa">Body jsou podmínka <b>nutná</b> (bez nich to nejde) i <b>postačující</b>
-          (s nimi to vyjde). Přesně to znamená ekvivalence. <span class="exr">A ⇔ B = 1</span></p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- zápis a čtení -->
-<section class="slide">
-  <div class="wrap">
-    <div class="kicker">Přehled</div>
-    <h2>Zápis, čtení a kdy co platí</h2>
-    <div class="card" style="margin-top:18px; padding:20px 8px">
-      <div class="tablewrap">
-        <table class="ref">
-          <tr><th>Spojka</th><th>Znak</th><th>Čteme nahlas</th><th>Pravdivá, když</th><th>Nepravdivá, když</th></tr>
-          <tr><td class="nm">Negace</td><td class="zn">¬A</td><td class="rd">„ne A“, „neplatí A“</td>
-              <td>A neplatí</td><td>A platí</td></tr>
-          <tr><td class="nm">Konjunkce</td><td class="zn">A ∧ B</td><td class="rd">„A a zároveň B“</td>
-              <td>platí obojí</td><td>aspoň jedno neplatí</td></tr>
-          <tr><td class="nm">Disjunkce</td><td class="zn">A ∨ B</td><td class="rd">„A nebo B“</td>
-              <td>platí aspoň jedno</td><td>neplatí ani jedno</td></tr>
-          <tr><td class="nm">Implikace</td><td class="zn">A ⇒ B</td><td class="rd">„jestliže A, pak B“</td>
-              <td>ve všech ostatních případech</td><td>A platí a B neplatí</td></tr>
-          <tr><td class="nm">Ekvivalence</td><td class="zn">A ⇔ B</td><td class="rd">„A právě tehdy, když B“</td>
-              <td>hodnoty se shodují</td><td>hodnoty se liší</td></tr>
-        </table>
-      </div>
-    </div>
-    <p class="lead" style="margin-top:16px">Implikaci se často říká i „z A plyne B“ nebo „A je
-      postačující podmínka pro B“. U ekvivalence uslyšíte „nutná a postačující podmínka“.</p>
-  </div>
-</section>
-
-<!-- 12 -->
-<section class="slide">
-  <div class="wrap">
-    <div class="kicker">Souhrn</div>
-    <h2>Všechny spojky v jedné tabulce</h2>
-    <div class="card" style="margin-top:16px">
-      <div class="tablewrap">
-      <table class="tt wide" style="min-width:700px">
-        <tr><th>A</th><th>B</th><th>slovy</th><th class="accent">A ∧ B</th><th class="accent">A ∨ B</th><th class="accent">A ⇒ B</th><th class="accent">A ⇔ B</th></tr>
-        <tr><td class="v0">0</td><td class="v0">0</td><td>nepravda, nepravda</td><td class="res v0">0</td><td class="res v0">0</td><td class="res v1">1</td><td class="res v1">1</td></tr>
-        <tr><td class="v0">0</td><td class="v1">1</td><td>nepravda, pravda</td><td class="res v0">0</td><td class="res v1">1</td><td class="res v1">1</td><td class="res v0">0</td></tr>
-        <tr><td class="v1">1</td><td class="v0">0</td><td>pravda, nepravda</td><td class="res v0">0</td><td class="res v1">1</td><td class="res v0">0</td><td class="res v0">0</td></tr>
-        <tr><td class="v1">1</td><td class="v1">1</td><td>pravda, pravda</td><td class="res v1">1</td><td class="res v1">1</td><td class="res v1">1</td><td class="res v1">1</td></tr>
-      </table>
-      </div>
-    </div>
-    <div class="grid g2" style="margin-top:18px">
-      <div class="card"><h3>Jak si to zapamatovat</h3>
-        <ul>
-          <li><b class="accent">∧</b> — jediná <b>jednička</b> v tabulce (série)</li>
-          <li><b class="accent">∨</b> — jediná <b>nula</b> v tabulce (paralelně)</li>
-          <li><b class="accent">⇒</b> — nula jen u <b>1 ⇒ 0</b> (porušený slib)</li>
-          <li><b class="accent">⇔</b> — jednička, když jsou hodnoty <b>stejné</b></li>
-        </ul>
-      </div>
-      <div class="card"><h3>Bonus: de Morganovy zákony</h3>
-        <p class="formula"><span class="sym">¬(A ∧ B) = ¬A ∨ ¬B</span></p>
-        <p class="formula"><span class="sym">¬(A ∨ B) = ¬A ∧ ¬B</span></p>
-        <p class="lead" style="margin-top:12px">Negace „obojí“ znamená „aspoň jedno neplatí“.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- 13 -->
 <section class="slide center">
   <div class="wrap" style="width:100%">
     <h1>Děkuji za pozornost</h1>
-    <p class="lead" style="font-size:clamp(17px,2.2vw,26px);max-width:760px">
-      Konjunkce = série · disjunkce = paralelně · implikace = slib · ekvivalence = shoda hodnot.
-    </p>
-    <p class="lead" style="margin-top:26px"><kbd>Home</kbd> vrátí prezentaci na začátek — k příkladům se dá kdykoliv vrátit a naklikat je znovu.</p>
   </div>
 </section>
 
@@ -1079,12 +677,6 @@ table.ref td.rd{font-style:italic}
     v.setAttribute('fill', on ? 'var(--live)' : 'var(--ink-3)');
   }
 
-  function markRow(table, a, b){
-    var key = (a ? '1' : '0') + (b ? '1' : '0');
-    Array.prototype.forEach.call(table.querySelectorAll('tr[data-row]'), function(tr){
-      tr.classList.toggle('on', tr.getAttribute('data-row') === key);
-    });
-  }
 
   function verdict(el, ok, html){
     el.className = 'verdict ' + (ok ? 't' : 'f');
@@ -1096,21 +688,12 @@ table.ref td.rd{font-style:italic}
     el.addEventListener('keydown', function(e){ if (e.key === 'Enter') fn(); });
   }
 
-  // ---------- negace ----------
-  (function(){
-    var a = true, va = document.getElementById('neg-a'), vn = document.getElementById('neg-na');
-    function render(){ setVal(va, a); setVal(vn, !a); }
-    var btn = document.getElementById('neg-btn');
-    btn.addEventListener('click', function(e){ e.currentTarget.blur(); a = !a; render(); });
-    render();
-    demos.push({ slide: btn.closest('.slide'), a: function(){ a = !a; render(); }, b: function(){ a = !a; render(); } });
-  })();
 
   // ---------- konjunkce: sériové zapojení ----------
   (function(){
     var seg = document.getElementById('ser-seg'), bulb = document.getElementById('ser-bulb');
     var swA = document.getElementById('ser-a'), swB = document.getElementById('ser-b');
-    var tt = document.getElementById('ser-tt'), vd = document.getElementById('ser-verdict');
+    var vd = document.getElementById('ser-verdict');
     var a = true, b = true;
     function render(){
       var r = a && b;
@@ -1120,11 +703,10 @@ table.ref td.rd{font-style:italic}
       setVal(document.getElementById('ser-va'), a);
       setVal(document.getElementById('ser-vb'), b);
       setVal(document.getElementById('ser-vr'), r);
-      markRow(tt, a, b);
-      if (r) verdict(vd, true, '<span class="res">Žárovka svítí.</span> Oba vypínače jsou sepnuté, proud projde celým obvodem. <b>A ∧ B = 1</b>');
-      else if (!a && !b) verdict(vd, false, '<span class="res">Žárovka nesvítí.</span> Rozepnuté jsou oba vypínače. <b>A ∧ B = 0</b>');
-      else if (!a) verdict(vd, false, '<span class="res">Žárovka nesvítí.</span> Vypínač <b>A</b> je rozepnutý a přerušuje obvod — nestačí, že B je sepnutý. <b>A ∧ B = 0</b>');
-      else verdict(vd, false, '<span class="res">Žárovka nesvítí.</span> Vypínač <b>B</b> je rozepnutý a přerušuje obvod — nestačí, že A je sepnutý. <b>A ∧ B = 0</b>');
+      if (r) verdict(vd, true, '<span class="res">Svítí.</span> Oba vypínače jsou sepnuté. <b>A ∧ B = 1</b>');
+      else if (!a && !b) verdict(vd, false, '<span class="res">Nesvítí.</span> Rozepnuté jsou oba vypínače. <b>A ∧ B = 0</b>');
+      else if (!a) verdict(vd, false, '<span class="res">Nesvítí.</span> Vypínač <b>A</b> přerušuje obvod. <b>A ∧ B = 0</b>');
+      else verdict(vd, false, '<span class="res">Nesvítí.</span> Vypínač <b>B</b> přerušuje obvod. <b>A ∧ B = 0</b>');
     }
     onTap(swA.querySelector('.hit'), function(){ a = !a; render(); });
     onTap(swB.querySelector('.hit'), function(){ b = !b; render(); });
@@ -1137,7 +719,7 @@ table.ref td.rd{font-style:italic}
     var shared = document.getElementById('par-shared'), sa = document.getElementById('par-sa'), sb = document.getElementById('par-sb');
     var bulb = document.getElementById('par-bulb');
     var swA = document.getElementById('par-a'), swB = document.getElementById('par-b');
-    var tt = document.getElementById('par-tt'), vd = document.getElementById('par-verdict');
+    var vd = document.getElementById('par-verdict');
     var a = true, b = true;
     function render(){
       var r = a || b;
@@ -1149,11 +731,10 @@ table.ref td.rd{font-style:italic}
       setVal(document.getElementById('par-va'), a);
       setVal(document.getElementById('par-vb'), b);
       setVal(document.getElementById('par-vr'), r);
-      markRow(tt, a, b);
-      if (a && b) verdict(vd, true, '<span class="res">Žárovka svítí.</span> Proud teče oběma větvemi zároveň. <b>A ∨ B = 1</b>');
-      else if (a) verdict(vd, true, '<span class="res">Žárovka svítí.</span> Stačí větev <b>A</b> — u disjunkce postačí jeden pravdivý výrok. <b>A ∨ B = 1</b>');
-      else if (b) verdict(vd, true, '<span class="res">Žárovka svítí.</span> Stačí větev <b>B</b> — u disjunkce postačí jeden pravdivý výrok. <b>A ∨ B = 1</b>');
-      else verdict(vd, false, '<span class="res">Žárovka nesvítí.</span> Teprve když jsou rozepnuté <b>oba</b> vypínače, je disjunkce nepravdivá. <b>A ∨ B = 0</b>');
+      if (a && b) verdict(vd, true, '<span class="res">Svítí.</span> Proud teče oběma větvemi. <b>A ∨ B = 1</b>');
+      else if (a) verdict(vd, true, '<span class="res">Svítí.</span> Stačí větev <b>A</b>. <b>A ∨ B = 1</b>');
+      else if (b) verdict(vd, true, '<span class="res">Svítí.</span> Stačí větev <b>B</b>. <b>A ∨ B = 1</b>');
+      else verdict(vd, false, '<span class="res">Nesvítí.</span> Rozepnuté jsou <b>obě</b> větve. <b>A ∨ B = 0</b>');
     }
     onTap(swA.querySelector('.hit'), function(){ a = !a; render(); });
     onTap(swB.querySelector('.hit'), function(){ b = !b; render(); });
@@ -1164,7 +745,7 @@ table.ref td.rd{font-style:italic}
   // ---------- implikace: mléko ⇒ buchta ----------
   (function(){
     var milk = document.getElementById('imp-milk'), cake = document.getElementById('imp-cake');
-    var tt = document.getElementById('imp-tt'), vd = document.getElementById('imp-verdict');
+    var vd = document.getElementById('imp-verdict');
     var a = true, b = true;
     function render(){
       var r = !a || b;
@@ -1175,11 +756,10 @@ table.ref td.rd{font-style:italic}
       setVal(document.getElementById('imp-va'), a);
       setVal(document.getElementById('imp-vb'), b);
       setVal(document.getElementById('imp-vr'), r);
-      markRow(tt, a, b);
-      if (a && b) verdict(vd, true, '<span class="res">Pravda.</span> Mléko dorazilo a buchta je na stole — slib byl splněn. <b>A ⇒ B = 1</b>');
-      else if (a && !b) verdict(vd, false, '<span class="res">Nepravda!</span> Mléko jsi přinesl, ale buchta nikde — <b>slib byl porušen</b>. Jediný případ, kdy je implikace nepravdivá. <b>A ⇒ B = 0</b>');
-      else if (!a && b) verdict(vd, true, '<span class="res">Pravda.</span> Mléko nebylo, ale buchta se přesto upekla. Slib nic takového nezakazoval. <b>A ⇒ B = 1</b>');
-      else verdict(vd, true, '<span class="res">Pravda.</span> Mléko nebylo, buchta taky ne — situace, které se slib týkal, vůbec nenastala. <b>A ⇒ B = 1</b>');
+      if (a && b) verdict(vd, true, '<span class="res">Pravda.</span> Slib byl splněn. <b>A ⇒ B = 1</b>');
+      else if (a && !b) verdict(vd, false, '<span class="res">Nepravda.</span> Mléko bylo, buchta ne — <b>slib porušen</b>. <b>A ⇒ B = 0</b>');
+      else if (!a && b) verdict(vd, true, '<span class="res">Pravda.</span> Buchta bez mléka? Slib to nezakazoval. <b>A ⇒ B = 1</b>');
+      else verdict(vd, true, '<span class="res">Pravda.</span> Slib nešlo porušit — mléko nebylo. <b>A ⇒ B = 1</b>');
     }
     onTap(milk.querySelector('.hit'), function(){ a = !a; render(); });
     onTap(cake.querySelector('.hit'), function(){ b = !b; render(); });
@@ -1192,7 +772,7 @@ table.ref td.rd{font-style:italic}
     var scene = document.getElementById('eq-scene');
     var light = document.getElementById('eq-light');
     var red = light.querySelector('.lamp.red'), green = light.querySelector('.lamp.green');
-    var tt = document.getElementById('eq-tt'), vd = document.getElementById('eq-verdict');
+    var vd = document.getElementById('eq-verdict');
     var a = true, b = true;
     function render(){
       var r = (a === b);
@@ -1204,11 +784,10 @@ table.ref td.rd{font-style:italic}
       setVal(document.getElementById('eq-va'), a);
       setVal(document.getElementById('eq-vb'), b);
       setVal(document.getElementById('eq-vr'), r);
-      markRow(tt, a, b);
-      if (a && b) verdict(vd, true, '<span class="res">Pravda.</span> Svítí zelená a chodec jde — oba výroky mají hodnotu 1. <b>A ⇔ B = 1</b>');
-      else if (!a && !b) verdict(vd, true, '<span class="res">Pravda.</span> Svítí červená a chodec stojí — oba výroky mají hodnotu 0, tedy se opět shodují. <b>A ⇔ B = 1</b>');
-      else if (a && !b) verdict(vd, false, '<span class="res">Nepravda.</span> Zelená svítí, ale chodec nejde — hodnoty se liší. <b>A ⇔ B = 0</b>');
-      else verdict(vd, false, '<span class="res">Nepravda.</span> Chodec jde na červenou ⚠ — hodnoty se liší (a v praxi je to nebezpečné). <b>A ⇔ B = 0</b>');
+      if (a && b) verdict(vd, true, '<span class="res">Pravda.</span> Zelená a jde — hodnoty se shodují. <b>A ⇔ B = 1</b>');
+      else if (!a && !b) verdict(vd, true, '<span class="res">Pravda.</span> Červená a stojí — hodnoty se shodují. <b>A ⇔ B = 1</b>');
+      else if (a && !b) verdict(vd, false, '<span class="res">Nepravda.</span> Zelená, ale nejde — hodnoty se liší. <b>A ⇔ B = 0</b>');
+      else verdict(vd, false, '<span class="res">Nepravda.</span> Jde na červenou — hodnoty se liší. <b>A ⇔ B = 0</b>');
     }
     onTap(light.querySelector('.hit'), function(){ a = !a; render(); });
     onTap(document.getElementById('eq-walker-hit'), function(){ b = !b; render(); });
