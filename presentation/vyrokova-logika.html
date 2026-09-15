@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Výroková logika — prezentace</title>
+<style>
+:root{
+  --bg:#0b1020; --bg2:#141c38; --card:#172041; --fg:#e9edfb; --muted:#96a2c6;
+  --line:#2a3560; --amber:#ffb020; --cyan:#35d2ff; --pink:#ff5d9e; --green:#3fe39a;
+  --red:#ff4f5e; --grey:#55608a;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; background:radial-gradient(1200px 800px at 70% -10%, #1b2550 0%, transparent 60%), var(--bg);
+  color:var(--fg); font-family:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  overflow:hidden;
+}
+.deck{position:fixed; inset:0}
+.slide{
+  position:absolute; inset:0; display:none;
+  padding:clamp(18px,3.4vh,48px) clamp(18px,4vw,64px) 68px;
+  overflow-y:auto; opacity:0; transform:translateY(14px);
+  transition:opacity .32s ease, transform .32s ease;
+}
+.slide.active{display:block}
+.slide.center.active{display:flex; align-items:center}
+.slide.shown{opacity:1; transform:none}
+.wrap{max-width:1280px; margin:0 auto}
+h1{font-size:clamp(34px,6.2vw,72px); line-height:1.05; margin:0 0 18px}
+h2{font-size:clamp(24px,3.6vw,44px); line-height:1.1; margin:0 0 6px}
+h3{font-size:clamp(17px,2vw,24px); margin:0 0 10px; color:var(--muted); font-weight:600}
+p{font-size:clamp(15px,1.7vw,21px); line-height:1.55; color:#d3dbf3; margin:0 0 14px}
+.lead{color:var(--muted)}
+.kicker{
+  display:inline-block; font-size:13px; letter-spacing:.18em; text-transform:uppercase;
+  color:var(--muted); border:1px solid var(--line); border-radius:999px; padding:6px 14px; margin-bottom:18px;
+}
+.accent-amber{color:var(--amber)} .accent-cyan{color:var(--cyan)}
+.accent-pink{color:var(--pink)} .accent-green{color:var(--green)}
+.card{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:18px 20px}
+.grid{display:grid; gap:18px}
+.g2{grid-template-columns:1fr 1fr}
+.g3{grid-template-columns:repeat(3,1fr)}
+@media (max-width:980px){ .grid{grid-template-columns:1fr !important} }
+ul{margin:0 0 10px 0; padding-left:22px}
+li{font-size:clamp(15px,1.6vw,20px); line-height:1.6; margin-bottom:8px; color:#d3dbf3}
+code,.sym{font-family:"Cascadia Code",Consolas,monospace}
+.sym{font-size:1.15em; font-weight:700}
+
+/* ---------- truth tables ---------- */
+table.tt{border-collapse:collapse; width:100%; font-size:clamp(14px,1.6vw,20px)}
+table.tt th,table.tt td{
+  border:1px solid var(--line); padding:8px 10px; text-align:center; transition:background .2s, color .2s;
+}
+table.tt th{color:var(--muted); font-weight:600; background:#111935}
+table.tt td.res{font-weight:700}
+table.tt tr.on td{background:#23306a; color:#fff}
+table.tt tr.on td.res{background:#2c3c85}
+.v1{color:var(--green); font-weight:700}
+.v0{color:var(--red); font-weight:700}
+
+/* ---------- chips / toggles ---------- */
+.chips{display:flex; flex-wrap:wrap; gap:10px; margin:12px 0}
+.chip{
+  display:flex; align-items:center; gap:10px; background:#111935; border:1px solid var(--line);
+  border-radius:12px; padding:10px 14px; font-size:clamp(14px,1.5vw,18px);
+}
+.chip b{font-weight:700}
+.val{
+  min-width:34px; text-align:center; border-radius:8px; padding:2px 8px; font-weight:800;
+  font-family:"Cascadia Code",Consolas,monospace;
+}
+.val.is1{background:rgba(63,227,154,.16); color:var(--green); border:1px solid rgba(63,227,154,.45)}
+.val.is0{background:rgba(255,79,94,.14); color:var(--red); border:1px solid rgba(255,79,94,.4)}
+.verdict{
+  margin-top:14px; border-radius:14px; padding:14px 18px; font-size:clamp(15px,1.8vw,22px);
+  border:1px solid var(--line); background:#111935;
+}
+.verdict.t{border-color:rgba(63,227,154,.5); background:rgba(63,227,154,.10)}
+.verdict.f{border-color:rgba(255,79,94,.5); background:rgba(255,79,94,.10)}
+.verdict .res{font-weight:800}
+button.tgl{
+  font:inherit; cursor:pointer; background:#1d2750; color:var(--fg); border:1px solid var(--line);
+  border-radius:10px; padding:9px 16px; transition:background .15s, border-color .15s;
+}
+button.tgl:hover{background:#26326a; border-color:#3d4c8c}
+.hint{color:var(--muted); font-size:14px; margin-top:8px}
+
+/* ---------- SVG scenes ---------- */
+svg.scene{width:100%; height:auto; display:block; touch-action:manipulation}
+.wire{fill:none; stroke:#4a568c; stroke-width:6; stroke-linecap:round; stroke-linejoin:round}
+.flow{fill:none; stroke:var(--amber); stroke-width:6; stroke-linecap:round; stroke-linejoin:round;
+      stroke-dasharray:10 20; opacity:0; transition:opacity .2s}
+.seg.live .flow{opacity:1; animation:dash .8s linear infinite}
+.seg.live .wire{stroke:#6f7cc4}
+@keyframes dash{ from{stroke-dashoffset:60} to{stroke-dashoffset:0} }
+.lever{stroke:#cfd7f5; stroke-width:7; stroke-linecap:round; transition:transform .18s ease}
+.sw.on .lever{stroke:var(--amber)}
+.term{fill:#0b1020; stroke:#8b97d4; stroke-width:4}
+.hit{fill:transparent; cursor:pointer}
+.swlabel{fill:#cfd7f5; font:700 20px "Segoe UI",sans-serif; text-anchor:middle; pointer-events:none}
+.swval{font:800 20px Consolas,monospace; text-anchor:middle; pointer-events:none}
+.batt{stroke:#cfd7f5; stroke-width:5; stroke-linecap:round}
+.bulbglass{fill:#1c2447; stroke:#8b97d4; stroke-width:4; transition:fill .25s}
+.lit .bulbglass{fill:#ffcf5a; stroke:#ffe6a3}
+.filament{fill:none; stroke:#8b97d4; stroke-width:3.5; transition:stroke .25s}
+.lit .filament{stroke:#7a4b00}
+.glow{opacity:0; transition:opacity .3s}
+.lit .glow{opacity:1}
+.caption{fill:var(--muted); font:600 17px "Segoe UI",sans-serif; text-anchor:middle}
+
+/* ---------- chrome ---------- */
+.bar{position:fixed; left:0; right:0; bottom:0; height:56px; display:flex; align-items:center;
+     gap:14px; padding:0 18px; background:linear-gradient(to top,rgba(7,10,22,.96),rgba(7,10,22,0));}
+.bar .spacer{flex:1}
+.bar button{font:inherit; cursor:pointer; background:#18224a; color:var(--fg); border:1px solid var(--line);
+            border-radius:10px; padding:7px 14px}
+.bar button:hover{background:#243065}
+.counter{color:var(--muted); font-variant-numeric:tabular-nums; font-size:15px; white-space:nowrap}
+.progress{position:fixed; top:0; left:0; height:3px; background:linear-gradient(90deg,var(--cyan),var(--pink));
+          width:0; transition:width .3s ease; z-index:5}
+.keys{color:var(--muted); font-size:14px}
+@media (max-width:780px){
+  .bar .keys{display:none}
+  .slide{padding-bottom:96px}
+  .bar{gap:8px; padding:0 10px}
+}
+kbd{background:#1b2452; border:1px solid var(--line); border-bottom-width:2px; border-radius:6px;
+    padding:2px 7px; font-family:inherit; font-size:.9em; color:#cdd6f6}
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+<div class="deck" id="deck">
+
+<!-- 1 -->
+<section class="slide center">
+  <div class="wrap" style="width:100%">
+    <div class="kicker">Matematika · logika</div>
+    <h1>Výroková logika</h1>
+    <p class="lead" style="font-size:clamp(17px,2.2vw,26px);max-width:800px">
+      Konjunkce, disjunkce, implikace a ekvivalence — s interaktivními příklady,
+      které si můžete přímo naklikat.
+    </p>
+    <div class="card" style="margin-top:28px;max-width:640px">
+      <h3 style="margin-bottom:12px">Ovládání</h3>
+      <p style="margin:0" class="keys">
+        <kbd>→</kbd> <kbd>mezerník</kbd> další snímek &nbsp;·&nbsp;
+        <kbd>←</kbd> zpět &nbsp;·&nbsp; <kbd>F</kbd> celá obrazovka &nbsp;·&nbsp;
+        <kbd>Home</kbd>/<kbd>End</kbd> první / poslední
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- 2 -->
+<section class="slide">
+  <div class="wrap">
+    <div class="kicker">Základ</div>
+    <h2>Co je výrok?</h2>
+    <p class="lead">Výrok je každé tvrzení, o kterém má smysl říct, že je <b class="accent-green">pravdivé (1)</b>, nebo <b style="color:var(--red)">nepravdivé (0)</b>.</p>
+    <div class="grid g2" style="margin-top:18px">
+      <div class="card">
+        <h3>✓ Výroky</h3>
+        <ul>
+          <li>„Praha je hlavní město ČR.“ → 1</li>
+          <li>„5 &gt; 9“ → 0</li>
+          <li>„Venku prší.“ → 1 nebo 0</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>✗ Nejsou výroky</h3>
+        <ul>
+          <li>„Kolik je hodin?“ (otázka)</li>
+          <li>„Zavři dveře!“ (rozkaz)</li>
+          <li>„x + 1 = 7“ (neznáme x)</li>
+        </ul>
+      </div>
+    </div>
+    <p style="margin-top:18px" class="lead">Výroky značíme písmeny <span class="sym">A</span>, <span class="sym">B</span>, <span class="sym">C</span>… a spojujeme je <b>logickými spojkami</b>.</p>
+  </div>
+</section>
+
+<!-- 3 -->
+<section class="slide">
+  <div class="wrap">
+    <div class="kicker">Přehled</div>
+    <h2>Logické spojky</h2>
+    <div class="grid g2" style="margin-top:18px">
+      <div class="card"><h3 class="accent-amber">Konjunkce &nbsp;<span class="sym">A ∧ B</span></h3><p style="margin:0">„A <b>a zároveň</b> B“ — pravdivá, jen když platí <b>obojí</b>.</p></div>
+      <div class="card"><h3 class="accent-cyan">Disjunkce &nbsp;<span class="sym">A ∨ B</span></h3><p style="margin:0">„A <b>nebo</b> B“ — pravdivá, když platí <b>aspoň jedno</b>.</p></div>
+      <div class="card"><h3 class="accent-pink">Implikace &nbsp;<span class="sym">A ⇒ B</span></h3><p style="margin:0">„<b>Když</b> A, <b>pak</b> B“ — nepravdivá jen při A = 1 a B = 0.</p></div>
+      <div class="card"><h3 class="accent-green">Ekvivalence &nbsp;<span class="sym">A ⇔ B</span></h3><p style="margin:0">„A <b>právě tehdy, když</b> B“ — pravdivá, když mají <b>stejnou</b> hodnotu.</p></div>
+    </div>
+    <div class="card" style="margin-top:18px">
+      <h3>Negace &nbsp;<span class="sym">¬A</span></h3>
+      <p style="margin:0 0 10px">Otočí pravdivostní hodnotu výroku na opačnou.</p>
+      <div class="chips" style="margin:0">
+        <div class="chip"><b>A</b> <span class="val is1" id="neg-a">1</span></div>
+        <div class="chip"><b>¬A</b> <span class="val is0" id="neg-na">0</span></div>
+        <button class="tgl" id="neg-btn">Přepnout A</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 4 -->
+<section class="slide">
+  <div class="wrap">
+    <div class="kicker accent-amber" style="border-color:rgba(255,176,32,.5);color:var(--amber)">Konjunkce</div>
+    <h2>Konjunkce <span class="sym accent-amber">A ∧ B</span></h2>
+    <p class="lead">Čteme „A <b>a zároveň</b> B“. Je pravdivá <b>pouze tehdy</b>, když jsou pravdivé oba výroky.</p>
+    <div class="grid g2" style="margin-top:18px">
+      <div class="card">
+        <h3>Pravdivostní tabulka</h3>
+        <table class="tt">
+          <tr><th>A</th><th>B</th><th>A ∧ B</th></tr>
+          <tr><td class="v0">0</td><td class="v0">0</td><td class="res v0">0</td></tr>
+          <tr><td class="v0">0</td><td class="v1">1</td><td class="res v0">0</td></tr>
+          <tr><td class="v1">1</td><td class="v0">0</td><td class="res v0">0</td></tr>
+          <tr><td class="v1">1</td><td class="v1">1</td><td class="res v1">1</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h3>Příklad ze života</h3>
+        <p>„Mám <b>hotovost</b> ∧ obchod má <b>otevřeno</b>.“</p>
+        <p style="margin:0">Nakoupím, jen když platí <b>obě</b> podmínky najednou. Stačí, aby jedna selhala, a celý výrok je nepravdivý.</p>
+        <p style="margin-top:14px" class="lead">V elektrotechnice tomu odpovídá <b class="accent-amber">sériové zapojení</b> — na dalším snímku.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 5 -->
+<section class="slide">
+  <div class="wrap">
+    <div class="kicker accent-amber" style="border-color:rgba(255,176,32,.5);color:var(--amber)">Konjunkce · interaktivně</div>
+    <h2>Sériové zapojení = <span class="sym accent-amber">A ∧ B</span></h2>
+    <p class="lead" style="margin-bottom:6px">Klikni na vypínače. Žárovka se rozsvítí, jen když jsou sepnuté <b>oba</b> — proud musí projít celým obvodem.</p>
+    <div class="grid g2" style="grid-template-columns:1.55fr 1fr;align-items:start">
+      <div class="card" style="padding:10px 12px">
+        <svg class="scene" viewBox="0 0 760 340" role="img" aria-label="Sériové zapojení dvou vypínačů">
+          <defs>
+            <radialGradient id="glowA"><stop offset="0%" stop-color="#ffcf5a" stop-opacity=".75"/><stop offset="100%" stop-color="#ffcf5a" stop-opacity="0"/></radialGradient>
+          </defs>
+          <g class="seg" id="ser-seg">
+            <path class="wire" d="M70,150 L70,70 L230,70"/><path class="flow" d="M70,150 L70,70 L230,70"/>
+            <path class="wire" d="M330,70 L430,70"/><path class="flow" d="M330,70 L430,70"/>
+            <path class="wire" d="M530,70 L660,70 L660,140"/><path class="flow" d="M530,70 L660,70 L660,140"/>
+            <path class="wire" d="M660,212 L660,290 L70,290 L70,200"/><path class="flow" d="M660,212 L660,290 L70,290 L70,200"/>
+          </g>
+          <g>
+            <line class="batt" x1="38" y1="154" x2="102" y2="154"/>
+            <line class="batt" x1="56" y1="168" x2="84" y2="168"/>
+            <line class="batt" x1="38" y1="182" x2="102" y2="182"/>
+            <line class="batt" x1="56" y1="196" x2="84" y2="196"/>
+            <text x="114" y="162" style="font:800 24px 'Segoe UI',sans-serif;fill:#cfd7f5">+</text>
+            <text x="114" y="206" style="font:800 24px 'Segoe UI',sans-serif;fill:#cfd7f5">–</text>
+            <text class="caption" x="70" y="240">baterie</text>
+          </g>
+          <g id="ser-bulb">
+            <circle class="glow" cx="660" cy="175" r="95" fill="url(#glowA)"/>
+            <rect x="645" y="203" width="30" height="14" rx="3" fill="#39436f"/>
+            <circle class="bulbglass" cx="660" cy="175" r="35"/>
+            <path class="filament" d="M648,188 C652,164 668,164 672,188"/>
+            <text class="caption" x="660" y="255">žárovka</text>
+          </g>
+          <g class="sw" id="ser-a" data-name="A">
+            <line class="lever" x1="230" y1="70" x2="330" y2="70"/>
+            <circle class="term" cx="230" cy="70" r="7"/><circle class="term" cx="330" cy="70" r="7"/>
+            <text class="swlabel" x="280" y="122">vypínač A</text>
+            <text class="swval" x="280" y="150">1</text>
+            <rect class="hit" x="205" y="8" width="150" height="160"/>
+          </g>
+          <g class="sw" id="ser-b" data-name="B">
+            <line class="lever" x1="430" y1="70" x2="530" y2="70"/>
+            <circle class="term" cx="430" cy="70" r="7"/><circle class="term" cx="530" cy="70" r="7"/>
+            <text class="swlabel" x="480" y="122">vypínač B</text>
+            <text class="swval" x="480" y="150">1</text>
+            <rect class="hit" x="405" y="8" width="150" height="160"/>
+          </g>
+        </svg>
+        <p class="hint" style="text-align:center">Klikni na vypínač A nebo B (nebo stiskni <kbd>A</kbd> / <kbd>B</kbd>).</p>
+      </div>
+      <div>
+        <div class="chips" style="margin-top:0">
+          <div class="chip"><b>A</b> — sepnuto <span class="val is1" id="ser-va">1</span></div>
+          <div class="chip"><b>B</b> — sepnuto <span class="val is1" id="ser-vb">1</span></div>
+          <div class="chip"><b>A ∧ B</b> <span class="val is1" id="ser-vr">1</span></div>
+        </div>
+        <div class="card" style="padding:12px 14px">
+          <table class="tt" id="ser-tt">
+            <tr><th>A</th><th>B</th><th>A ∧ B</th><th>žárovka</th></tr>
+            <tr data-row="00"><td class="v0">0</td><td class="v0">0</td><td class="res v0">0</td><td>nesvítí</td></tr>
+            <tr data-row="01"><td class="v0">0</td><td class="v1">1</td><td class="res v0">0</td><td>nesvítí</td></tr>
+            <tr data-row="10"><td class="v1">1</td><td class="v0">0</td><td class="res v0">0</td><td>nesvítí</td></tr>
+            <tr data-row="11"><td class="v1">1</td><td class="v1">1</td><td class="res v1">1</td><td>svítí</td></tr>
+          </table>
+        </div>
+        <div class="verdict t" id="ser-verdict"><span class="res">Svítí.</span> Oba vypínače jsou sepnuté, obvod je uzavřený.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 6 -->
+<section class="slide">
+  <div class="wrap">
+    <div class="kicker accent-cyan" style="border-color:rgba(53,210,255,.5);color:var(--cyan)">Disjunkce</div>
+    <h2>Disjunkce <span class="sym accent-cyan">A ∨ B</span></h2>
+    <p class="lead">Čteme „A <b>nebo</b> B“. Je nepravdivá <b>pouze tehdy</b>, když jsou nepravdivé oba výroky. Jde o <b>nevylučovací</b> „nebo“ — platit mohou i obě zároveň.</p>
+    <div class="grid g2" style="margin-top:18px">
+      <div class="card">
+        <h3>Pravdivostní tabulka</h3>
+        <table class="tt">
+          <tr><th>A</th><th>B</th><th>A ∨ B</th></tr>
+          <tr><td class="v0">0</td><td class="v0">0</td><td class="res v0">0</td></tr>
+          <tr><td class="v0">0</td><td class="v1">1</td><td class="res v1">1</td></tr>
+          <tr><td class="v1">1</td><td class="v0">0</td><td class="res v1">1</td></tr>
+          <tr><td class="v1">1</td><td class="v1">1</td><td class="res v1">1</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h3>Příklad ze života</h3>
+        <p>„Přijedu <b>autem</b> ∨ přijedu <b>vlakem</b>.“</p>
+        <p style="margin:0">Slib splním, pokud dorazím aspoň jedním způsobem. Porušen je jen tehdy, když nepřijedu vůbec.</p>
+        <p style="margin-top:14px" class="lead">V elektrotechnice tomu odpovídá <b class="accent-cyan">paralelní zapojení</b> — na dalším snímku.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 7 -->
+<section class="slide">
+  <div class="wrap">
+    <div class="kicker accent-cyan" style="border-color:rgba(53,210,255,.5);color:var(--cyan)">Disjunkce · interaktivně</div>
+    <h2>Paralelní zapojení = <span class="sym accent-cyan">A ∨ B</span></h2>
+    <p class="lead" style="margin-bottom:6px">Klikni na vypínače. Stačí sepnout <b>kterýkoli jeden</b> — proud si najde cestu a žárovka svítí.</p>
+    <div class="grid g2" style="grid-template-columns:1.55fr 1fr;align-items:start">
+      <div class="card" style="padding:10px 12px">
+        <svg class="scene" viewBox="0 0 760 360" role="img" aria-label="Paralelní zapojení dvou vypínačů">
+          <defs>
+            <radialGradient id="glowB"><stop offset="0%" stop-color="#ffcf5a" stop-opacity=".75"/><stop offset="100%" stop-color="#ffcf5a" stop-opacity="0"/></radialGradient>
+          </defs>
+          <g class="seg" id="par-shared">
+            <path class="wire" d="M70,150 L70,115 L230,115"/><path class="flow" d="M70,150 L70,115 L230,115"/>
+            <path class="wire" d="M230,55 L230,175"/>
+            <path class="wire" d="M530,55 L530,175"/>
+            <path class="wire" d="M530,115 L660,115 L660,155"/><path class="flow" d="M530,115 L660,115 L660,155"/>
+            <path class="wire" d="M660,227 L660,310 L70,310 L70,200"/><path class="flow" d="M660,227 L660,310 L70,310 L70,200"/>
+          </g>
+          <g class="seg" id="par-sa">
+            <path class="flow" d="M230,115 L230,55"/><path class="flow" d="M530,55 L530,115"/>
+            <path class="wire" d="M230,55 L330,55"/><path class="flow" d="M230,55 L330,55"/>
+            <path class="wire" d="M430,55 L530,55"/><path class="flow" d="M430,55 L530,55"/>
+          </g>
+          <g class="seg" id="par-sb">
+            <path class="flow" d="M230,115 L230,175"/><path class="flow" d="M530,175 L530,115"/>
+            <path class="wire" d="M230,175 L330,175"/><path class="flow" d="M230,175 L330,175"/>
+            <path class="wire" d="M430,175 L530,175"/><path class="flow" d="M430,175 L530,175"/>
+          </g>
+          <g>
+            <line class="batt" x1="38" y1="154" x2="102" y2="154"/>
+            <line class="batt" x1="56" y1="168" x2="84" y2="168"/>
+            <line class="batt" x1="38" y1="182" x2="102" y2="182"/>
+            <line class="batt" x1="56" y1="196" x2="84" y2="196"/>
+            <text x="114" y="162" style="font:800 24px 'Segoe UI',sans-serif;fill:#cfd7f5">+</text>
+            <text x="114" y="206" style="font:800 24px 'Segoe UI',sans-serif;fill:#cfd7f5">–</text>
+            <text class="caption" x="70" y="240">baterie</text>
+          </g>
+          <g id="par-bulb">
+            <circle class="glow" cx="660" cy="190" r="95" fill="url(#glowB)"/>
+            <rect x="645" y="218" width="30" height="14" rx="3" fill="#39436f"/>
+            <circle class="bulbglass" cx="660" cy="190" r="35"/>
+            <path class="filament" d="M648,203 C652,179 668,179 672,203"/>
+            <text class="caption" x="660" y="270">žárovka</text>
+          </g>
+          <g class="sw" id="par-a" data-name="A">
+            <line class="lever" x1="330" y1="55" x2="430" y2="55"/>
+            <circle class="term" cx="330" cy="55" r="7"/><circle class="term" cx="430" cy="55" r="7"/>
+            <text class="swlabel" x="380" y="100">vypínač A</text>
+            <text class="swval" x="380" y="127">1</text>
+            <rect class="hit" x="305" y="0" width="150" height="140"/>
+          </g>
+          <g class="sw" id="par-b" data-name="B">
+            <line class="lever" x1="330" y1="175" x2="430" y2="175"/>
+            <circle class="term" cx="330" cy="175" r="7"/><circle class="term" cx="430" cy="175" r="7"/>
+            <text class="swlabel" x="380" y="220">vypínač B</text>
+            <text class="swval" x="380" y="247">1</text>
+            <rect class="hit" x="305" y="140" width="150" height="130"/>
+          </g>
+        </svg>
+        <p class="hint" style="text-align:center">Klikni na vypínač A nebo B (nebo stiskni <kbd>A</kbd> / <kbd>B</kbd>).</p>
+      </div>
+      <div>
+        <div class="chips" style="margin-top:0">
+          <div class="chip"><b>A</b> — sepnuto <span class="val is1" id="par-va">1</span></div>
+          <div class="chip"><b>B</b> — sepnuto <span class="val is1" id="par-vb">1</span></div>
+          <div class="chip"><b>A ∨ B</b> <span class="val is1" id="par-vr">1</span></div>
+        </div>
+        <div class="card" style="padding:12px 14px">
+          <table class="tt" id="par-tt">
+            <tr><th>A</th><th>B</th><th>A ∨ B</th><th>žárovka</th></tr>
+            <tr data-row="00"><td class="v0">0</td><td class="v0">0</td><td class="res v0">0</td><td>nesvítí</td></tr>
+            <tr data-row="01"><td class="v0">0</td><td class="v1">1</td><td class="res v1">1</td><td>svítí</td></tr>
+            <tr data-row="10"><td class="v1">1</td><td class="v0">0</td><td class="res v1">1</td><td>svítí</td></tr>
+            <tr data-row="11"><td class="v1">1</td><td class="v1">1</td><td class="res v1">1</td><td>svítí</td></tr>
+          </table>
+        </div>
+        <div class="verdict t" id="par-verdict"><span class="res">Svítí.</span> Proud teče oběma větvemi.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 8 -->
+<section class="slide">
+  <div class="wrap">
+    <div class="kicker accent-pink" style="border-color:rgba(255,93,158,.5);color:var(--pink)">Implikace</div>
+    <h2>Implikace <span class="sym accent-pink">A ⇒ B</span></h2>
+    <p class="lead">Čteme „<b>jestliže</b> A, <b>pak</b> B“. A je <b>předpoklad</b>, B je <b>závěr</b>. Implikace je nepravdivá v <b>jediném případě</b>: předpoklad platí, ale závěr ne.</p>
+    <div class="grid g2" style="margin-top:18px">
+      <div class="card">
+        <h3>Pravdivostní tabulka</h3>
+        <table class="tt">
+          <tr><th>A</th><th>B</th><th>A ⇒ B</th></tr>
+          <tr><td class="v0">0</td><td class="v0">0</td><td class="res v1">1</td></tr>
+          <tr><td class="v0">0</td><td class="v1">1</td><td class="res v1">1</td></tr>
+          <tr><td class="v1">1</td><td class="v0">0</td><td class="res v0">0</td></tr>
+          <tr><td class="v1">1</td><td class="v1">1</td><td class="res v1">1</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h3>Pozor — časté nedorozumění</h3>
+        <p>Když <b>předpoklad neplatí</b> (A = 0), je implikace <b>vždy pravdivá</b> — slib nebyl porušen, protože nenastala situace, které se týkal.</p>
+        <p style="margin:0">Implikace <b>neznamená příčinu</b>, jen říká, co se nesmí stát: A = 1 a zároveň B = 0.</p>
+        <p style="margin-top:14px" class="lead">Příklad: <b class="accent-pink">„Přineseš-li mléko, bude buchta.“</b></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 9 -->
+<section class="slide">
+  <div class="wrap">
+    <div class="kicker accent-pink" style="border-color:rgba(255,93,158,.5);color:var(--pink)">Implikace · interaktivně</div>
+    <h2>„Pokud přineseš mléko, bude buchta.“</h2>
+    <p class="lead" style="margin-bottom:6px">
+      <b>A</b> = přineseš mléko &nbsp;·&nbsp; <b>B</b> = bude buchta &nbsp;·&nbsp; zkoumáme <span class="sym accent-pink">A ⇒ B</span>
+    </p>
+    <div class="grid g2" style="grid-template-columns:1.55fr 1fr;align-items:start">
+      <div class="card" style="padding:10px 12px">
+        <svg class="scene" viewBox="0 0 760 320" role="img" aria-label="Mléko a buchta">
+          <g class="obj" id="imp-milk">
+            <g class="art">
+              <path d="M110,120 L170,64 L230,120 Z" fill="#dde4ff" stroke="#8b97d4" stroke-width="4" stroke-linejoin="round"/>
+              <rect x="110" y="120" width="120" height="140" rx="6" fill="#eef2ff" stroke="#8b97d4" stroke-width="4"/>
+              <rect x="126" y="152" width="88" height="56" rx="5" fill="#35d2ff" opacity=".28"/>
+              <text x="170" y="190" text-anchor="middle" style="font:700 24px 'Segoe UI',sans-serif;fill:#1b2550">MLÉKO</text>
+            </g>
+            <rect class="hit" x="96" y="50" width="150" height="225"/>
+          </g>
+          <text x="380" y="180" text-anchor="middle" style="font:800 64px 'Segoe UI',sans-serif;fill:#ff5d9e">⇒</text>
+          <g class="obj" id="imp-cake">
+            <g class="art">
+              <ellipse cx="590" cy="262" rx="118" ry="16" fill="#39436f"/>
+              <rect x="512" y="170" width="156" height="88" rx="8" fill="#c98a55" stroke="#8b97d4" stroke-width="3"/>
+              <path d="M512,152 H668 V186 q-19.5,20 -39,0 q-19.5,20 -39,0 q-19.5,20 -39,0 q-19.5,20 -39,0 Z" fill="#f5d9b0" stroke="#8b97d4" stroke-width="3" stroke-linejoin="round"/>
+              <path d="M590,138 q10,-14 18,-16" fill="none" stroke="#3fe39a" stroke-width="4" stroke-linecap="round"/>
+              <circle cx="590" cy="142" r="13" fill="#ff4f5e" stroke="#b02631" stroke-width="3"/>
+            </g>
+            <rect class="hit" x="500" y="120" width="180" height="160"/>
+          </g>
+          <text class="caption" x="170" y="300" id="imp-cap-milk">mléko: ANO</text>
+          <text class="caption" x="590" y="300" id="imp-cap-cake">buchta: ANO</text>
+        </svg>
+        <p class="hint" style="text-align:center">Klikni na mléko nebo na buchtu a měň situaci (<kbd>A</kbd> / <kbd>B</kbd>).</p>
+      </div>
+      <div>
+        <div class="chips" style="margin-top:0">
+          <div class="chip"><b>A</b> — mléko <span class="val is1" id="imp-va">1</span></div>
+          <div class="chip"><b>B</b> — buchta <span class="val is1" id="imp-vb">1</span></div>
+          <div class="chip"><b>A ⇒ B</b> <span class="val is1" id="imp-vr">1</span></div>
+        </div>
+        <div class="card" style="padding:12px 14px">
+          <table class="tt" id="imp-tt">
+            <tr><th>A</th><th>B</th><th>A ⇒ B</th><th>situace</th></tr>
+            <tr data-row="00"><td class="v0">0</td><td class="v0">0</td><td class="res v1">1</td><td>slib platí</td></tr>
+            <tr data-row="01"><td class="v0">0</td><td class="v1">1</td><td class="res v1">1</td><td>slib platí</td></tr>
+            <tr data-row="10"><td class="v1">1</td><td class="v0">0</td><td class="res v0">0</td><td>slib porušen</td></tr>
+            <tr data-row="11"><td class="v1">1</td><td class="v1">1</td><td class="res v1">1</td><td>slib splněn</td></tr>
+          </table>
+        </div>
+        <div class="verdict t" id="imp-verdict"><span class="res">Pravda.</span> Mléko dorazilo a buchta je na stole — slib byl splněn.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 10 -->
+<section class="slide">
+  <div class="wrap">
+    <div class="kicker accent-green" style="border-color:rgba(63,227,154,.5);color:var(--green)">Ekvivalence</div>
+    <h2>Ekvivalence <span class="sym accent-green">A ⇔ B</span></h2>
+    <p class="lead">Čteme „A <b>právě tehdy, když</b> B“. Je pravdivá, když mají oba výroky <b>stejnou</b> pravdivostní hodnotu — obě platí, nebo obě neplatí.</p>
+    <div class="grid g2" style="margin-top:18px">
+      <div class="card">
+        <h3>Pravdivostní tabulka</h3>
+        <table class="tt">
+          <tr><th>A</th><th>B</th><th>A ⇔ B</th></tr>
+          <tr><td class="v0">0</td><td class="v0">0</td><td class="res v1">1</td></tr>
+          <tr><td class="v0">0</td><td class="v1">1</td><td class="res v0">0</td></tr>
+          <tr><td class="v1">1</td><td class="v0">0</td><td class="res v0">0</td></tr>
+          <tr><td class="v1">1</td><td class="v1">1</td><td class="res v1">1</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h3>Dobré vědět</h3>
+        <p>Ekvivalence je vlastně <b>implikace v obou směrech</b>:</p>
+        <p style="text-align:center;font-size:1.15em"><span class="sym">(A ⇒ B) ∧ (B ⇒ A)</span></p>
+        <p style="margin:0">V matematice odpovídá formulaci „<b>nutná a postačující podmínka</b>“.</p>
+        <p style="margin-top:14px" class="lead">Příklad: <b class="accent-green">„Chodec jde právě tehdy, když svítí zelená.“</b></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 11 -->
+<section class="slide">
+  <div class="wrap">
+    <div class="kicker accent-green" style="border-color:rgba(63,227,154,.5);color:var(--green)">Ekvivalence · interaktivně</div>
+    <h2>„Chodec jde právě tehdy, když svítí zelená.“</h2>
+    <p class="lead" style="margin-bottom:6px">
+      <b>A</b> = svítí zelená &nbsp;·&nbsp; <b>B</b> = chodec přechází &nbsp;·&nbsp; zkoumáme <span class="sym accent-green">A ⇔ B</span>
+    </p>
+    <div class="grid g2" style="grid-template-columns:1.55fr 1fr;align-items:start">
+      <div class="card" style="padding:10px 12px">
+        <svg class="scene" viewBox="0 0 760 340" id="eq-scene" role="img" aria-label="Semafor a chodec na přechodu">
+          <rect x="250" y="20" width="420" height="300" fill="#242c4e"/>
+          <line x1="250" y1="20" x2="250" y2="320" stroke="#39436f" stroke-width="4"/>
+          <line x1="670" y1="20" x2="670" y2="320" stroke="#39436f" stroke-width="4"/>
+          <g fill="#e9edfb" opacity=".45">
+            <rect x="262" y="140" width="396" height="16" rx="3"/>
+            <rect x="262" y="172" width="396" height="16" rx="3"/>
+            <rect x="262" y="204" width="396" height="16" rx="3"/>
+            <rect x="262" y="236" width="396" height="16" rx="3"/>
+          </g>
+          <g id="eq-light">
+            <line x1="120" y1="200" x2="120" y2="310" stroke="#39436f" stroke-width="10" stroke-linecap="round"/>
+            <rect x="82" y="60" width="76" height="140" rx="14" fill="#1b2346" stroke="#8b97d4" stroke-width="4"/>
+            <circle class="lamp red" cx="120" cy="100" r="24"/>
+            <circle class="lamp green" cx="120" cy="160" r="24"/>
+            <rect class="hit" x="72" y="50" width="96" height="270"/>
+          </g>
+          <g transform="translate(232,300)">
+            <g class="walker" id="eq-walker">
+              <circle cx="0" cy="-92" r="15" fill="#ffd27d" stroke="#8b97d4" stroke-width="3"/>
+              <line x1="0" y1="-77" x2="0" y2="-34" stroke="#cfd7f5" stroke-width="8" stroke-linecap="round"/>
+              <line class="limb arm1" x1="0" y1="-66" x2="-20" y2="-44" stroke="#cfd7f5" stroke-width="7" stroke-linecap="round"/>
+              <line class="limb arm2" x1="0" y1="-66" x2="20" y2="-44" stroke="#cfd7f5" stroke-width="7" stroke-linecap="round"/>
+              <line class="limb leg1" x1="0" y1="-34" x2="-16" y2="0" stroke="#cfd7f5" stroke-width="8" stroke-linecap="round"/>
+              <line class="limb leg2" x1="0" y1="-34" x2="16" y2="0" stroke="#cfd7f5" stroke-width="8" stroke-linecap="round"/>
+            </g>
+          </g>
+          <rect class="hit" id="eq-walker-hit" x="180" y="190" width="120" height="130"/>
+          <text class="caption" x="120" y="336" id="eq-cap-light">semafor: ZELENÁ</text>
+          <text class="caption" x="460" y="336" id="eq-cap-walk">chodec: JDE</text>
+        </svg>
+        <p class="hint" style="text-align:center">Klikni na semafor nebo na chodce (<kbd>A</kbd> / <kbd>B</kbd>).</p>
+      </div>
+      <div>
+        <div class="chips" style="margin-top:0">
+          <div class="chip"><b>A</b> — zelená <span class="val is1" id="eq-va">1</span></div>
+          <div class="chip"><b>B</b> — jde <span class="val is1" id="eq-vb">1</span></div>
+          <div class="chip"><b>A ⇔ B</b> <span class="val is1" id="eq-vr">1</span></div>
+        </div>
+        <div class="card" style="padding:12px 14px">
+          <table class="tt" id="eq-tt">
+            <tr><th>A</th><th>B</th><th>A ⇔ B</th><th>situace</th></tr>
+            <tr data-row="00"><td class="v0">0</td><td class="v0">0</td><td class="res v1">1</td><td>červená, stojí</td></tr>
+            <tr data-row="01"><td class="v0">0</td><td class="v1">1</td><td class="res v0">0</td><td>červená, jde ⚠</td></tr>
+            <tr data-row="10"><td class="v1">1</td><td class="v0">0</td><td class="res v0">0</td><td>zelená, stojí</td></tr>
+            <tr data-row="11"><td class="v1">1</td><td class="v1">1</td><td class="res v1">1</td><td>zelená, jde</td></tr>
+          </table>
+        </div>
+        <div class="verdict t" id="eq-verdict"><span class="res">Pravda.</span> Svítí zelená a chodec jde — obě hodnoty se shodují.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 12 -->
+<section class="slide">
+  <div class="wrap">
+    <div class="kicker">Souhrn</div>
+    <h2>Všechny spojky v jedné tabulce</h2>
+    <div class="card" style="margin-top:16px">
+      <table class="tt">
+        <tr><th>A</th><th>B</th><th class="accent-amber">A ∧ B</th><th class="accent-cyan">A ∨ B</th><th class="accent-pink">A ⇒ B</th><th class="accent-green">A ⇔ B</th></tr>
+        <tr><td class="v0">0</td><td class="v0">0</td><td class="res v0">0</td><td class="res v0">0</td><td class="res v1">1</td><td class="res v1">1</td></tr>
+        <tr><td class="v0">0</td><td class="v1">1</td><td class="res v0">0</td><td class="res v1">1</td><td class="res v1">1</td><td class="res v0">0</td></tr>
+        <tr><td class="v1">1</td><td class="v0">0</td><td class="res v0">0</td><td class="res v1">1</td><td class="res v0">0</td><td class="res v0">0</td></tr>
+        <tr><td class="v1">1</td><td class="v1">1</td><td class="res v1">1</td><td class="res v1">1</td><td class="res v1">1</td><td class="res v1">1</td></tr>
+      </table>
+    </div>
+    <div class="grid g2" style="margin-top:18px">
+      <div class="card"><h3>Jak si to zapamatovat</h3>
+        <ul>
+          <li><b class="accent-amber">∧</b> — jediná <b>jednička</b> v tabulce (série)</li>
+          <li><b class="accent-cyan">∨</b> — jediná <b>nula</b> v tabulce (paralelně)</li>
+          <li><b class="accent-pink">⇒</b> — nula jen u <b>1 ⇒ 0</b> (porušený slib)</li>
+          <li><b class="accent-green">⇔</b> — jednička, když jsou hodnoty <b>stejné</b></li>
+        </ul>
+      </div>
+      <div class="card"><h3>Bonus: de Morganovy zákony</h3>
+        <p style="text-align:center;font-size:1.1em"><span class="sym">¬(A ∧ B) = ¬A ∨ ¬B</span></p>
+        <p style="text-align:center;font-size:1.1em;margin:0"><span class="sym">¬(A ∨ B) = ¬A ∧ ¬B</span></p>
+        <p class="lead" style="margin-top:12px">Negace „obojí“ znamená „aspoň jedno neplatí“.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 13 -->
+<section class="slide center">
+  <div class="wrap" style="width:100%">
+    <h1>Děkuji za pozornost</h1>
+    <p class="lead" style="font-size:clamp(17px,2.2vw,26px);max-width:760px">
+      Konjunkce = série · disjunkce = paralelně · implikace = slib · ekvivalence = shoda hodnot.
+    </p>
+    <p class="keys" style="margin-top:24px"><kbd>Home</kbd> zpět na začátek · k příkladům se dá kdykoliv vrátit a naklikat je znovu.</p>
+  </div>
+</section>
+
+</div>
+
+<div class="bar">
+  <button id="btn-prev" type="button">← Zpět</button>
+  <button id="btn-next" type="button">Další →</button>
+  <span class="counter" id="counter">1 / 13</span>
+  <span class="spacer"></span>
+  <span class="keys">mezerník / šipky · <kbd>F</kbd> fullscreen</span>
+  <button id="btn-fs" type="button">Celá obrazovka</button>
+</div>
+
+<style>
+.lamp{fill:#2a3560; stroke:#0b1020; stroke-width:3; transition:fill .2s, filter .2s}
+.lamp.on.red{fill:#ff4f5e; filter:drop-shadow(0 0 14px rgba(255,79,94,.9))}
+.lamp.on.green{fill:#3fe39a; filter:drop-shadow(0 0 14px rgba(63,227,154,.9))}
+#eq-light .hit{cursor:pointer}
+.walker{transform:translateX(0); filter:drop-shadow(0 0 5px rgba(11,16,32,.95))}
+.walking .walker{animation:cross 5s linear infinite}
+.walking .limb{transform-box:fill-box; transform-origin:top center; animation:swing .55s ease-in-out infinite alternate}
+.walking .arm2,.walking .leg2{animation-direction:alternate-reverse}
+@keyframes cross{ 0%{transform:translateX(0)} 88%{transform:translateX(420px)} 100%{transform:translateX(420px)} }
+@keyframes swing{ from{transform:rotate(16deg)} to{transform:rotate(-16deg)} }
+.obj .art{transition:opacity .25s, filter .25s}
+.obj.absent .art{opacity:.22; filter:grayscale(1)}
+.obj .hit{cursor:pointer}
+@media (prefers-reduced-motion: reduce){
+  .seg.live .flow{animation:none}
+  .walking .walker,.walking .limb{animation:none}
+  .slide{transition:none}
+}
+</style>
+
+<script>
+(function(){
+  "use strict";
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var idx = 0;
+  var counter = document.getElementById('counter');
+  var progress = document.getElementById('progress');
+  var demos = [];               // { slide: <section>, a: fn, b: fn }
+
+  function show(n){
+    n = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach(function(s, i){
+      if (i === n) { s.classList.add('active'); }
+      else { s.classList.remove('active'); s.classList.remove('shown'); }
+    });
+    requestAnimationFrame(function(){ slides[n].classList.add('shown'); });
+    slides[n].scrollTop = 0;
+    idx = n;
+    counter.textContent = (n + 1) + ' / ' + slides.length;
+    progress.style.width = ((n + 1) / slides.length * 100) + '%';
+  }
+
+  function hotkey(which){
+    for (var i = 0; i < demos.length; i++){
+      if (demos[i].slide === slides[idx]) { demos[i][which](); return true; }
+    }
+    return false;
+  }
+
+  function toggleFs(){
+    if (document.fullscreenElement) { document.exitFullscreen(); }
+    else if (document.documentElement.requestFullscreen) { document.documentElement.requestFullscreen(); }
+  }
+
+  document.addEventListener('keydown', function(e){
+    if (e.ctrlKey || e.altKey || e.metaKey) return;
+    var k = e.key;
+    if (k === ' ' || k === 'Spacebar' || k === 'ArrowRight' || k === 'ArrowDown' || k === 'PageDown'){
+      e.preventDefault(); show(idx + 1);
+    } else if (k === 'ArrowLeft' || k === 'ArrowUp' || k === 'PageUp' || k === 'Backspace'){
+      e.preventDefault(); show(idx - 1);
+    } else if (k === 'Home'){ e.preventDefault(); show(0); }
+    else if (k === 'End'){ e.preventDefault(); show(slides.length - 1); }
+    else if (k === 'f' || k === 'F'){ e.preventDefault(); toggleFs(); }
+    else if (k === 'a' || k === 'A'){ if (hotkey('a')) e.preventDefault(); }
+    else if (k === 'b' || k === 'B'){ if (hotkey('b')) e.preventDefault(); }
+  });
+
+  document.getElementById('btn-prev').addEventListener('click', function(e){ e.currentTarget.blur(); show(idx - 1); });
+  document.getElementById('btn-next').addEventListener('click', function(e){ e.currentTarget.blur(); show(idx + 1); });
+  document.getElementById('btn-fs').addEventListener('click', function(e){ e.currentTarget.blur(); toggleFs(); });
+
+  // swipe na dotykových zařízeních
+  var tx = 0, ty = 0;
+  document.addEventListener('touchstart', function(e){ tx = e.changedTouches[0].clientX; ty = e.changedTouches[0].clientY; }, {passive:true});
+  document.addEventListener('touchend', function(e){
+    var dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty;
+    if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.6) { show(idx + (dx < 0 ? 1 : -1)); }
+  }, {passive:true});
+
+  // ---------- pomocné funkce ----------
+  function setVal(el, v){ el.textContent = v ? '1' : '0'; el.className = 'val ' + (v ? 'is1' : 'is0'); }
+
+  function setSwitch(g, on){
+    g.classList.toggle('on', on);
+    var lever = g.querySelector('.lever');
+    var x = lever.getAttribute('x1'), y = lever.getAttribute('y1');
+    if (on) { lever.removeAttribute('transform'); }
+    else { lever.setAttribute('transform', 'rotate(-32 ' + x + ' ' + y + ')'); }
+    var v = g.querySelector('.swval');
+    v.textContent = on ? '1' : '0';
+    v.setAttribute('fill', on ? '#3fe39a' : '#ff4f5e');
+  }
+
+  function markRow(table, a, b){
+    var key = (a ? '1' : '0') + (b ? '1' : '0');
+    Array.prototype.forEach.call(table.querySelectorAll('tr[data-row]'), function(tr){
+      tr.classList.toggle('on', tr.getAttribute('data-row') === key);
+    });
+  }
+
+  function verdict(el, ok, html){
+    el.className = 'verdict ' + (ok ? 't' : 'f');
+    el.innerHTML = html;
+  }
+
+  function onTap(el, fn){
+    el.addEventListener('click', fn);
+    el.addEventListener('keydown', function(e){ if (e.key === 'Enter') fn(); });
+  }
+
+  // ---------- negace ----------
+  (function(){
+    var a = true, va = document.getElementById('neg-a'), vn = document.getElementById('neg-na');
+    function render(){ setVal(va, a); setVal(vn, !a); }
+    var btn = document.getElementById('neg-btn');
+    btn.addEventListener('click', function(e){ e.currentTarget.blur(); a = !a; render(); });
+    render();
+    demos.push({ slide: btn.closest('.slide'), a: function(){ a = !a; render(); }, b: function(){ a = !a; render(); } });
+  })();
+
+  // ---------- konjunkce: sériové zapojení ----------
+  (function(){
+    var seg = document.getElementById('ser-seg'), bulb = document.getElementById('ser-bulb');
+    var swA = document.getElementById('ser-a'), swB = document.getElementById('ser-b');
+    var tt = document.getElementById('ser-tt'), vd = document.getElementById('ser-verdict');
+    var a = true, b = true;
+    function render(){
+      var r = a && b;
+      setSwitch(swA, a); setSwitch(swB, b);
+      seg.classList.toggle('live', r);
+      bulb.classList.toggle('lit', r);
+      setVal(document.getElementById('ser-va'), a);
+      setVal(document.getElementById('ser-vb'), b);
+      setVal(document.getElementById('ser-vr'), r);
+      markRow(tt, a, b);
+      if (r) verdict(vd, true, '<span class="res">Žárovka svítí.</span> Oba vypínače jsou sepnuté, proud projde celým obvodem. <b>A ∧ B = 1</b>');
+      else if (!a && !b) verdict(vd, false, '<span class="res">Žárovka nesvítí.</span> Rozepnuté jsou oba vypínače. <b>A ∧ B = 0</b>');
+      else if (!a) verdict(vd, false, '<span class="res">Žárovka nesvítí.</span> Vypínač <b>A</b> je rozepnutý a přerušuje obvod — nestačí, že B je sepnutý. <b>A ∧ B = 0</b>');
+      else verdict(vd, false, '<span class="res">Žárovka nesvítí.</span> Vypínač <b>B</b> je rozepnutý a přerušuje obvod — nestačí, že A je sepnutý. <b>A ∧ B = 0</b>');
+    }
+    onTap(swA.querySelector('.hit'), function(){ a = !a; render(); });
+    onTap(swB.querySelector('.hit'), function(){ b = !b; render(); });
+    render();
+    demos.push({ slide: seg.closest('.slide'), a: function(){ a = !a; render(); }, b: function(){ b = !b; render(); } });
+  })();
+
+  // ---------- disjunkce: paralelní zapojení ----------
+  (function(){
+    var shared = document.getElementById('par-shared'), sa = document.getElementById('par-sa'), sb = document.getElementById('par-sb');
+    var bulb = document.getElementById('par-bulb');
+    var swA = document.getElementById('par-a'), swB = document.getElementById('par-b');
+    var tt = document.getElementById('par-tt'), vd = document.getElementById('par-verdict');
+    var a = true, b = true;
+    function render(){
+      var r = a || b;
+      setSwitch(swA, a); setSwitch(swB, b);
+      sa.classList.toggle('live', a);
+      sb.classList.toggle('live', b);
+      shared.classList.toggle('live', r);
+      bulb.classList.toggle('lit', r);
+      setVal(document.getElementById('par-va'), a);
+      setVal(document.getElementById('par-vb'), b);
+      setVal(document.getElementById('par-vr'), r);
+      markRow(tt, a, b);
+      if (a && b) verdict(vd, true, '<span class="res">Žárovka svítí.</span> Proud teče oběma větvemi zároveň. <b>A ∨ B = 1</b>');
+      else if (a) verdict(vd, true, '<span class="res">Žárovka svítí.</span> Stačí větev <b>A</b> — u disjunkce postačí jeden pravdivý výrok. <b>A ∨ B = 1</b>');
+      else if (b) verdict(vd, true, '<span class="res">Žárovka svítí.</span> Stačí větev <b>B</b> — u disjunkce postačí jeden pravdivý výrok. <b>A ∨ B = 1</b>');
+      else verdict(vd, false, '<span class="res">Žárovka nesvítí.</span> Teprve když jsou rozepnuté <b>oba</b> vypínače, je disjunkce nepravdivá. <b>A ∨ B = 0</b>');
+    }
+    onTap(swA.querySelector('.hit'), function(){ a = !a; render(); });
+    onTap(swB.querySelector('.hit'), function(){ b = !b; render(); });
+    render();
+    demos.push({ slide: shared.closest('.slide'), a: function(){ a = !a; render(); }, b: function(){ b = !b; render(); } });
+  })();
+
+  // ---------- implikace: mléko ⇒ buchta ----------
+  (function(){
+    var milk = document.getElementById('imp-milk'), cake = document.getElementById('imp-cake');
+    var tt = document.getElementById('imp-tt'), vd = document.getElementById('imp-verdict');
+    var a = true, b = true;
+    function render(){
+      var r = !a || b;
+      milk.classList.toggle('absent', !a);
+      cake.classList.toggle('absent', !b);
+      document.getElementById('imp-cap-milk').textContent = 'mléko: ' + (a ? 'ANO' : 'NE');
+      document.getElementById('imp-cap-cake').textContent = 'buchta: ' + (b ? 'ANO' : 'NE');
+      setVal(document.getElementById('imp-va'), a);
+      setVal(document.getElementById('imp-vb'), b);
+      setVal(document.getElementById('imp-vr'), r);
+      markRow(tt, a, b);
+      if (a && b) verdict(vd, true, '<span class="res">Pravda.</span> Mléko dorazilo a buchta je na stole — slib byl splněn. <b>A ⇒ B = 1</b>');
+      else if (a && !b) verdict(vd, false, '<span class="res">Nepravda!</span> Mléko jsi přinesl, ale buchta nikde — <b>slib byl porušen</b>. Jediný případ, kdy je implikace nepravdivá. <b>A ⇒ B = 0</b>');
+      else if (!a && b) verdict(vd, true, '<span class="res">Pravda.</span> Mléko nebylo, ale buchta se přesto upekla. Slib nic takového nezakazoval. <b>A ⇒ B = 1</b>');
+      else verdict(vd, true, '<span class="res">Pravda.</span> Mléko nebylo, buchta taky ne — situace, které se slib týkal, vůbec nenastala. <b>A ⇒ B = 1</b>');
+    }
+    onTap(milk.querySelector('.hit'), function(){ a = !a; render(); });
+    onTap(cake.querySelector('.hit'), function(){ b = !b; render(); });
+    render();
+    demos.push({ slide: milk.closest('.slide'), a: function(){ a = !a; render(); }, b: function(){ b = !b; render(); } });
+  })();
+
+  // ---------- ekvivalence: semafor ⇔ chodec ----------
+  (function(){
+    var scene = document.getElementById('eq-scene');
+    var light = document.getElementById('eq-light');
+    var red = light.querySelector('.lamp.red'), green = light.querySelector('.lamp.green');
+    var tt = document.getElementById('eq-tt'), vd = document.getElementById('eq-verdict');
+    var a = true, b = true;
+    function render(){
+      var r = (a === b);
+      green.classList.toggle('on', a);
+      red.classList.toggle('on', !a);
+      scene.classList.toggle('walking', b);
+      document.getElementById('eq-cap-light').textContent = 'semafor: ' + (a ? 'ZELENÁ' : 'ČERVENÁ');
+      document.getElementById('eq-cap-walk').textContent = 'chodec: ' + (b ? 'JDE' : 'STOJÍ');
+      setVal(document.getElementById('eq-va'), a);
+      setVal(document.getElementById('eq-vb'), b);
+      setVal(document.getElementById('eq-vr'), r);
+      markRow(tt, a, b);
+      if (a && b) verdict(vd, true, '<span class="res">Pravda.</span> Svítí zelená a chodec jde — oba výroky mají hodnotu 1. <b>A ⇔ B = 1</b>');
+      else if (!a && !b) verdict(vd, true, '<span class="res">Pravda.</span> Svítí červená a chodec stojí — oba výroky mají hodnotu 0, tedy se opět shodují. <b>A ⇔ B = 1</b>');
+      else if (a && !b) verdict(vd, false, '<span class="res">Nepravda.</span> Zelená svítí, ale chodec nejde — hodnoty se liší. <b>A ⇔ B = 0</b>');
+      else verdict(vd, false, '<span class="res">Nepravda.</span> Chodec jde na červenou ⚠ — hodnoty se liší (a v praxi je to nebezpečné). <b>A ⇔ B = 0</b>');
+    }
+    onTap(light.querySelector('.hit'), function(){ a = !a; render(); });
+    onTap(document.getElementById('eq-walker-hit'), function(){ b = !b; render(); });
+    render();
+    demos.push({ slide: scene.closest('.slide'), a: function(){ a = !a; render(); }, b: function(){ b = !b; render(); } });
+  })();
+
+  show(0);
+})();
+</script>
+</body>
+</html>
