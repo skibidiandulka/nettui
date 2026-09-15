@@ -288,12 +288,50 @@ p.keys{border:0; padding:0; display:block; line-height:2.1; letter-spacing:.12em
 .gatecap{font-family:var(--mono); font-weight:500; font-size:10.5px; letter-spacing:.14em;
          text-transform:uppercase; color:var(--ink-3); margin:0; max-width:24ch; line-height:1.8}
 .card p{max-width:58ch}
+table.mini{border-collapse:collapse; background:var(--panel); border:1px solid var(--rule);
+  font-variant-numeric:tabular-nums}
+table.mini th{font-family:var(--mono); font-weight:500; font-size:10.5px; letter-spacing:.14em;
+  color:var(--ink-2); text-align:center; padding:8px 15px 7px; border-bottom:1px solid var(--rule);
+  white-space:nowrap}
+table.mini td{font-family:var(--mono); font-weight:500; font-size:16px; text-align:center;
+  padding:6px 15px; border-bottom:1px solid var(--rule-soft); transition:background .18s}
+table.mini tr:last-child td{border-bottom:0}
+table.mini td.v1{color:var(--live)}
+table.mini td.v0{color:var(--ink-3)}
+table.mini th:last-child,table.mini td.res{border-left:1px solid var(--rule)}
+table.mini tr.on td{background:var(--live-soft)}
+table.mini tr.on td:first-child{box-shadow:inset 3px 0 0 var(--live)}
+
+.tablewrap{overflow-x:auto}
+table.ref{border-collapse:collapse; width:100%; min-width:760px; font-variant-numeric:tabular-nums}
+table.ref th{font-family:var(--mono); font-weight:500; font-size:11px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink-2); text-align:left; padding:0 14px 11px 0;
+  border-bottom:1px solid var(--rule); white-space:nowrap; vertical-align:bottom}
+table.ref th.c{text-align:center; padding-right:0}
+table.ref th.grp{text-align:center; padding-bottom:7px; font-size:10px; color:var(--ink-3)}
+table.ref td{padding:13px 14px 13px 0; border-bottom:1px solid var(--rule-soft);
+  color:var(--text); font-size:clamp(14px,1.4vw,17px); vertical-align:baseline}
+table.ref tr:last-child td{border-bottom:0}
+table.ref td.zn{font-family:var(--mono); font-weight:500; color:var(--live); white-space:nowrap;
+  font-size:1.08em}
+table.ref td.rd{font-style:italic; white-space:nowrap}
+table.ref td.c{text-align:center; padding-right:0; font-family:var(--mono); font-weight:500; font-size:1.05em}
+table.ref td.v1{color:var(--live)}
+table.ref td.v0{color:var(--ink-3)}
+table.ref .sep{border-left:1px solid var(--rule)}
+.legend{font-family:var(--mono); font-weight:500; font-size:11px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink-3); margin-top:16px}
+
+.under{display:grid; grid-template-columns:1fr auto; gap:20px; align-items:start; margin-top:16px}
+.under-l{display:grid; gap:12px; align-content:start}
+@media (max-width:780px){ .under{grid-template-columns:1fr} }
+
 /* schéma je teď hlavní obsah snímku — šířku vážeme na výšku okna, ať se vše vejde */
-.wrap-demo{max-width:min(1040px, 92vh)}
+.wrap-demo{max-width:min(1040px, 78vh)}
 .wrap-demo h2{font-size:clamp(23px,2.9vw,38px); margin-bottom:12px}
 .wrap-demo .drawing{margin-top:4px}
-.wrap-demo .chips{margin:16px 0 0}
-.wrap-demo .verdict{margin-top:12px}
+.wrap-demo .chips{margin:0}
+.wrap-demo .verdict{margin:0}
 .note{border:1px solid var(--rule); border-left:3px solid var(--live); background:var(--panel);
       padding:14px 18px; font-size:clamp(15px,1.5vw,18px); line-height:1.55; color:var(--text)}
 .note b{color:var(--ink)}
@@ -405,12 +443,23 @@ table.ref td.rd{font-style:italic}
         </svg>
         <p class="hint"><span><b>Schéma 01 · Sériové zapojení</b></span><span>Klikni na spínače &nbsp;·&nbsp; přepni <kbd>A</kbd> <kbd>B</kbd></span></p>
       </div>
-    <div class="chips">
+    <div class="under">
+      <div class="under-l">
+        <div class="chips">
           <div class="chip"><b>A</b> <span class="val is1" id="ser-va">1</span></div>
           <div class="chip"><b>B</b> <span class="val is1" id="ser-vb">1</span></div>
           <div class="chip"><b>A ∧ B</b> <span class="val is1" id="ser-vr">1</span></div>
         </div>
-    <div class="verdict t" id="ser-verdict"><span class="res">Svítí.</span> Oba vypínače jsou sepnuté.</div>
+        <div class="verdict t" id="ser-verdict"><span class="res">Svítí.</span> Oba vypínače jsou sepnuté.</div>
+      </div>
+        <table class="mini" id="ser-tt">
+          <tr><th>A</th><th>B</th><th>A ∧ B</th></tr>
+          <tr data-row="00"><td class="v0">0</td><td class="v0">0</td><td class="res v0">0</td></tr>
+          <tr data-row="01"><td class="v0">0</td><td class="v1">1</td><td class="res v0">0</td></tr>
+          <tr data-row="10"><td class="v1">1</td><td class="v0">0</td><td class="res v0">0</td></tr>
+          <tr data-row="11"><td class="v1">1</td><td class="v1">1</td><td class="res v1">1</td></tr>
+        </table>
+    </div>
   </div>
 </section>
 <section class="slide">
@@ -476,12 +525,23 @@ table.ref td.rd{font-style:italic}
         </svg>
         <p class="hint"><span><b>Schéma 02 · Paralelní zapojení</b></span><span>Klikni na spínače &nbsp;·&nbsp; přepni <kbd>A</kbd> <kbd>B</kbd></span></p>
       </div>
-    <div class="chips">
+    <div class="under">
+      <div class="under-l">
+        <div class="chips">
           <div class="chip"><b>A</b> <span class="val is1" id="par-va">1</span></div>
           <div class="chip"><b>B</b> <span class="val is1" id="par-vb">1</span></div>
           <div class="chip"><b>A ∨ B</b> <span class="val is1" id="par-vr">1</span></div>
         </div>
-    <div class="verdict t" id="par-verdict"><span class="res">Svítí.</span> Proud teče oběma větvemi.</div>
+        <div class="verdict t" id="par-verdict"><span class="res">Svítí.</span> Proud teče oběma větvemi.</div>
+      </div>
+        <table class="mini" id="par-tt">
+          <tr><th>A</th><th>B</th><th>A ∨ B</th></tr>
+          <tr data-row="00"><td class="v0">0</td><td class="v0">0</td><td class="res v0">0</td></tr>
+          <tr data-row="01"><td class="v0">0</td><td class="v1">1</td><td class="res v1">1</td></tr>
+          <tr data-row="10"><td class="v1">1</td><td class="v0">0</td><td class="res v1">1</td></tr>
+          <tr data-row="11"><td class="v1">1</td><td class="v1">1</td><td class="res v1">1</td></tr>
+        </table>
+    </div>
   </div>
 </section>
 <section class="slide">
@@ -518,12 +578,23 @@ table.ref td.rd{font-style:italic}
         </svg>
         <p class="hint"><span><b>Situace 03 · Slib</b></span><span>Klikni na mléko nebo na buchtu &nbsp;·&nbsp; přepni <kbd>A</kbd> <kbd>B</kbd></span></p>
       </div>
-    <div class="chips">
+    <div class="under">
+      <div class="under-l">
+        <div class="chips">
           <div class="chip"><b>A</b> <span class="val is1" id="imp-va">1</span></div>
           <div class="chip"><b>B</b> <span class="val is1" id="imp-vb">1</span></div>
           <div class="chip"><b>A ⇒ B</b> <span class="val is1" id="imp-vr">1</span></div>
         </div>
-    <div class="verdict t" id="imp-verdict"><span class="res">Pravda.</span> Mléko dorazilo a buchta je na stole — slib byl splněn.</div>
+        <div class="verdict t" id="imp-verdict"><span class="res">Pravda.</span> Mléko dorazilo a buchta je na stole — slib byl splněn.</div>
+      </div>
+        <table class="mini" id="imp-tt">
+          <tr><th>A</th><th>B</th><th>A ⇒ B</th></tr>
+          <tr data-row="00"><td class="v0">0</td><td class="v0">0</td><td class="res v1">1</td></tr>
+          <tr data-row="01"><td class="v0">0</td><td class="v1">1</td><td class="res v1">1</td></tr>
+          <tr data-row="10"><td class="v1">1</td><td class="v0">0</td><td class="res v0">0</td></tr>
+          <tr data-row="11"><td class="v1">1</td><td class="v1">1</td><td class="res v1">1</td></tr>
+        </table>
+    </div>
   </div>
 </section>
 <section class="slide">
@@ -536,14 +607,18 @@ table.ref td.rd{font-style:italic}
           <rect x="230" y="8" width="410" height="292" fill="var(--road)"/>
           <line x1="230" y1="8" x2="230" y2="300" stroke="var(--ink)" stroke-width="3"/>
           <line x1="640" y1="8" x2="640" y2="300" stroke="var(--ink)" stroke-width="3"/>
-          <path d="M435,12 L435,98 M435,262 L435,296" fill="none" stroke="var(--stripe)"
+          <path d="M435,12 L435,96 M435,264 L435,296" fill="none" stroke="var(--stripe)"
                 stroke-width="5" stroke-dasharray="20 16"/>
           <g fill="var(--stripe)">
-            <rect x="240" y="110" width="390" height="18"/>
-            <rect x="240" y="140" width="390" height="18"/>
-            <rect x="240" y="170" width="390" height="18"/>
-            <rect x="240" y="200" width="390" height="18"/>
-            <rect x="240" y="230" width="390" height="18"/>
+            <rect x="240" y="108" width="24" height="144"/>
+            <rect x="286" y="108" width="24" height="144"/>
+            <rect x="332" y="108" width="24" height="144"/>
+            <rect x="378" y="108" width="24" height="144"/>
+            <rect x="424" y="108" width="24" height="144"/>
+            <rect x="470" y="108" width="24" height="144"/>
+            <rect x="516" y="108" width="24" height="144"/>
+            <rect x="562" y="108" width="24" height="144"/>
+            <rect x="608" y="108" width="24" height="144"/>
           </g>
           <g transform="translate(185,240)">
             <g class="walker" id="eq-walker">
@@ -568,12 +643,49 @@ table.ref td.rd{font-style:italic}
         </svg>
         <p class="hint"><span><b>Situace 04 · Přechod</b></span><span>Klikni na semafor nebo na chodce &nbsp;·&nbsp; přepni <kbd>A</kbd> <kbd>B</kbd></span></p>
       </div>
-    <div class="chips">
+    <div class="under">
+      <div class="under-l">
+        <div class="chips">
           <div class="chip"><b>A</b> <span class="val is1" id="eq-va">1</span></div>
           <div class="chip"><b>B</b> <span class="val is1" id="eq-vb">1</span></div>
           <div class="chip"><b>A ⇔ B</b> <span class="val is1" id="eq-vr">1</span></div>
         </div>
-    <div class="verdict t" id="eq-verdict"><span class="res">Pravda.</span> Svítí zelená a chodec jde — obě hodnoty se shodují.</div>
+        <div class="verdict t" id="eq-verdict"><span class="res">Pravda.</span> Svítí zelená a chodec jde — obě hodnoty se shodují.</div>
+      </div>
+        <table class="mini" id="eq-tt">
+          <tr><th>A</th><th>B</th><th>A ⇔ B</th></tr>
+          <tr data-row="00"><td class="v0">0</td><td class="v0">0</td><td class="res v1">1</td></tr>
+          <tr data-row="01"><td class="v0">0</td><td class="v1">1</td><td class="res v0">0</td></tr>
+          <tr data-row="10"><td class="v1">1</td><td class="v0">0</td><td class="res v0">0</td></tr>
+          <tr data-row="11"><td class="v1">1</td><td class="v1">1</td><td class="res v1">1</td></tr>
+        </table>
+    </div>
+  </div>
+</section>
+<section class="slide">
+  <div class="wrap">
+    <div class="kicker">Souhrn</div>
+    <h2>Kdy která formule platí</h2>
+    <div class="tablewrap">
+      <table class="ref">
+        <tr>
+          <th rowspan="2">Znak</th>
+          <th rowspan="2">Říká se</th>
+          <th colspan="4" class="grp">kombinace A a B</th>
+          <th rowspan="2" class="sep">Pravdivá, když</th>
+          <th rowspan="2">Nepravdivá, když</th>
+        </tr>
+        <tr>
+          <th class="c sep">0 0</th><th class="c">0 1</th><th class="c">1 0</th><th class="c">1 1</th>
+        </tr>
+          <tr><td class="zn">¬A</td><td class="rd">„ne A“</td><td class="c v1 sep">1</td><td class="c v1">1</td><td class="c v0">0</td><td class="c v0">0</td><td class="sep">A neplatí</td><td>A platí</td></tr>
+          <tr><td class="zn">A ∧ B</td><td class="rd">„A a B“</td><td class="c v0 sep">0</td><td class="c v0">0</td><td class="c v0">0</td><td class="c v1">1</td><td class="sep">platí obojí</td><td>aspoň jedno neplatí</td></tr>
+          <tr><td class="zn">A ∨ B</td><td class="rd">„A nebo B“</td><td class="c v0 sep">0</td><td class="c v1">1</td><td class="c v1">1</td><td class="c v1">1</td><td class="sep">platí aspoň jedno</td><td>neplatí ani jedno</td></tr>
+          <tr><td class="zn">A ⇒ B</td><td class="rd">„když A, tak B“</td><td class="c v1 sep">1</td><td class="c v1">1</td><td class="c v0">0</td><td class="c v1">1</td><td class="sep">ve všech ostatních případech</td><td>A platí a B ne</td></tr>
+          <tr><td class="zn">A ⇔ B</td><td class="rd">„A právě když B“</td><td class="c v1 sep">1</td><td class="c v0">0</td><td class="c v0">0</td><td class="c v1">1</td><td class="sep">hodnoty se shodují</td><td>hodnoty se liší</td></tr>
+      </table>
+    </div>
+    <p class="legend">1 = pravda &nbsp;·&nbsp; 0 = nepravda &nbsp;·&nbsp; ¬A závisí jen na A</p>
   </div>
 </section>
 <section class="slide center">
@@ -689,6 +801,13 @@ table.ref td.rd{font-style:italic}
   }
 
 
+  function markRow(table, a, b){
+    var key = (a ? '1' : '0') + (b ? '1' : '0');
+    Array.prototype.forEach.call(table.querySelectorAll('tr[data-row]'), function(tr){
+      tr.classList.toggle('on', tr.getAttribute('data-row') === key);
+    });
+  }
+
   function verdict(el, ok, html){
     el.className = 'verdict ' + (ok ? 't' : 'f');
     el.innerHTML = html;
@@ -704,7 +823,7 @@ table.ref td.rd{font-style:italic}
   (function(){
     var seg = document.getElementById('ser-seg'), bulb = document.getElementById('ser-bulb');
     var swA = document.getElementById('ser-a'), swB = document.getElementById('ser-b');
-    var vd = document.getElementById('ser-verdict');
+    var tt = document.getElementById('ser-tt'), vd = document.getElementById('ser-verdict');
     var a = true, b = true;
     function render(){
       var r = a && b;
@@ -714,6 +833,7 @@ table.ref td.rd{font-style:italic}
       setVal(document.getElementById('ser-va'), a);
       setVal(document.getElementById('ser-vb'), b);
       setVal(document.getElementById('ser-vr'), r);
+      markRow(tt, a, b);
       if (r) verdict(vd, true, '<span class="res">Svítí.</span> Oba vypínače jsou sepnuté. <b>A ∧ B = 1</b>');
       else if (!a && !b) verdict(vd, false, '<span class="res">Nesvítí.</span> Rozepnuté jsou oba vypínače. <b>A ∧ B = 0</b>');
       else if (!a) verdict(vd, false, '<span class="res">Nesvítí.</span> Vypínač <b>A</b> přerušuje obvod. <b>A ∧ B = 0</b>');
@@ -730,7 +850,7 @@ table.ref td.rd{font-style:italic}
     var shared = document.getElementById('par-shared'), sa = document.getElementById('par-sa'), sb = document.getElementById('par-sb');
     var bulb = document.getElementById('par-bulb');
     var swA = document.getElementById('par-a'), swB = document.getElementById('par-b');
-    var vd = document.getElementById('par-verdict');
+    var tt = document.getElementById('par-tt'), vd = document.getElementById('par-verdict');
     var a = true, b = true;
     function render(){
       var r = a || b;
@@ -742,6 +862,7 @@ table.ref td.rd{font-style:italic}
       setVal(document.getElementById('par-va'), a);
       setVal(document.getElementById('par-vb'), b);
       setVal(document.getElementById('par-vr'), r);
+      markRow(tt, a, b);
       if (a && b) verdict(vd, true, '<span class="res">Svítí.</span> Proud teče oběma větvemi. <b>A ∨ B = 1</b>');
       else if (a) verdict(vd, true, '<span class="res">Svítí.</span> Stačí větev <b>A</b>. <b>A ∨ B = 1</b>');
       else if (b) verdict(vd, true, '<span class="res">Svítí.</span> Stačí větev <b>B</b>. <b>A ∨ B = 1</b>');
@@ -756,7 +877,7 @@ table.ref td.rd{font-style:italic}
   // ---------- implikace: mléko ⇒ buchta ----------
   (function(){
     var milk = document.getElementById('imp-milk'), cake = document.getElementById('imp-cake');
-    var vd = document.getElementById('imp-verdict');
+    var tt = document.getElementById('imp-tt'), vd = document.getElementById('imp-verdict');
     var a = true, b = true;
     function render(){
       var r = !a || b;
@@ -767,6 +888,7 @@ table.ref td.rd{font-style:italic}
       setVal(document.getElementById('imp-va'), a);
       setVal(document.getElementById('imp-vb'), b);
       setVal(document.getElementById('imp-vr'), r);
+      markRow(tt, a, b);
       if (a && b) verdict(vd, true, '<span class="res">Pravda.</span> Slib byl splněn. <b>A ⇒ B = 1</b>');
       else if (a && !b) verdict(vd, false, '<span class="res">Nepravda.</span> Mléko bylo, buchta ne — <b>slib porušen</b>. <b>A ⇒ B = 0</b>');
       else if (!a && b) verdict(vd, true, '<span class="res">Pravda.</span> Buchta bez mléka? Slib to nezakazoval. <b>A ⇒ B = 1</b>');
@@ -783,7 +905,7 @@ table.ref td.rd{font-style:italic}
     var scene = document.getElementById('eq-scene');
     var light = document.getElementById('eq-light');
     var red = light.querySelector('.lamp.red'), green = light.querySelector('.lamp.green');
-    var vd = document.getElementById('eq-verdict');
+    var tt = document.getElementById('eq-tt'), vd = document.getElementById('eq-verdict');
     var a = true, b = true;
     function render(){
       var r = (a === b);
@@ -795,6 +917,7 @@ table.ref td.rd{font-style:italic}
       setVal(document.getElementById('eq-va'), a);
       setVal(document.getElementById('eq-vb'), b);
       setVal(document.getElementById('eq-vr'), r);
+      markRow(tt, a, b);
       if (a && b) verdict(vd, true, '<span class="res">Pravda.</span> Zelená a jde — hodnoty se shodují. <b>A ⇔ B = 1</b>');
       else if (!a && !b) verdict(vd, true, '<span class="res">Pravda.</span> Červená a stojí — hodnoty se shodují. <b>A ⇔ B = 1</b>');
       else if (a && !b) verdict(vd, false, '<span class="res">Nepravda.</span> Zelená, ale nejde — hodnoty se liší. <b>A ⇔ B = 0</b>');

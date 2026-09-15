@@ -29,10 +29,12 @@ tabulka jdou na tabuli.
 3. **Disjunkce** — paralelní zapojení, proud teče jen sepnutou větví
 4. **Implikace** — „Pokud přineseš mléko, bude buchta.“
 5. **Ekvivalence** — semafor a chodec na přechodu
-6. Závěr
+6. Souhrnná tabulka — znak, jak se říká nahlas a kdy formule platí
+7. Závěr
 
-Na každém snímku se u výroků zobrazuje jejich pravdivostní hodnota (0/1) a pod
-schématem je jednořádkové vyhodnocení.
+Na každém snímku se u výroků zobrazuje jejich pravdivostní hodnota (0/1), vedle
+schématu je malá pravdivostní tabulka se zvýrazněnou aktuální kombinací a pod ní
+jednořádkové vyhodnocení.
 
 ## Podklad pro výklad
 
