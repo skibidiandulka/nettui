@@ -1017,8 +1017,13 @@ table.ref td.rd{font-style:italic}
   }
 
   function toggleFs(){
-    if (document.fullscreenElement) { document.exitFullscreen(); }
-    else if (document.documentElement.requestFullscreen) { document.documentElement.requestFullscreen(); }
+    var noop = function(){};   // iOS ani vnořený rám fullscreen nepovolí
+    try {
+      if (document.fullscreenElement) { var x = document.exitFullscreen(); if (x && x.catch) x.catch(noop); }
+      else if (document.documentElement.requestFullscreen) {
+        var y = document.documentElement.requestFullscreen(); if (y && y.catch) y.catch(noop);
+      }
+    } catch (e) { /* nevadí, listovat jde dál */ }
   }
 
   document.addEventListener('keydown', function(e){
