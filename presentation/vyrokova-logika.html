@@ -126,7 +126,7 @@ table.tt tr.on td:first-child{box-shadow:inset 3px 0 0 var(--live)}
   color:var(--ink-2); border-right:1px solid var(--rule); white-space:nowrap;
 }
 .chip:last-child{border-right:0}
-.chip b{font-weight:500; color:var(--ink); letter-spacing:.14em}
+.chip b{font-weight:500; color:var(--ink); letter-spacing:.14em; font-size:15px}
 .val{
   font-family:var(--mono); font-weight:500; font-size:15px; min-width:26px; text-align:center;
   padding:1px 7px; border:1px solid transparent;
@@ -174,8 +174,8 @@ svg.scene{width:100%; height:auto; touch-action:manipulation}
 .sw.on .lever{stroke:var(--live)}
 .term{fill:var(--panel); stroke:var(--ink-2); stroke-width:2.5}
 .hit{fill:transparent; cursor:pointer}
-.swlabel{fill:var(--ink); font-family:var(--mono); font-weight:500; font-size:15px;
-         letter-spacing:.1em; text-anchor:middle; pointer-events:none; text-transform:uppercase}
+.swlabel{fill:var(--ink); font-family:var(--mono); font-weight:500; font-size:26px;
+         letter-spacing:.02em; text-anchor:middle; pointer-events:none}
 .swval{font-family:var(--mono); font-weight:500; font-size:20px; text-anchor:middle; pointer-events:none}
 .desig{fill:var(--ink-2); font-family:var(--mono); font-weight:500; font-size:12px; letter-spacing:.1em}
 .batt{stroke:var(--ink); stroke-width:4; stroke-linecap:round}
@@ -194,10 +194,17 @@ svg.scene{width:100%; height:auto; touch-action:manipulation}
 .lamp.on.green{fill:#1E9E63; filter:drop-shadow(0 0 13px rgba(30,158,99,.55))}
 #eq-light .hit{cursor:pointer}
 .walker{transform:translateX(0); filter:drop-shadow(0 0 4px rgba(255,255,255,.95))}
-.walking .walker{animation:cross 5s linear infinite}
+.walking .walker{animation:cross 9s linear infinite}
 .walking .limb{transform-box:fill-box; transform-origin:top center; animation:swing .55s ease-in-out infinite alternate}
 .walking .arm2,.walking .leg2{animation-direction:alternate-reverse}
-@keyframes cross{ 0%{transform:translateX(0)} 88%{transform:translateX(420px)} 100%{transform:translateX(420px)} }
+@keyframes cross{
+  0%{transform:translateX(0) scaleX(1)}
+  6%{transform:translateX(0) scaleX(1)}
+  46%{transform:translateX(505px) scaleX(1)}
+  52%{transform:translateX(505px) scaleX(-1)}
+  92%{transform:translateX(0) scaleX(-1)}
+  100%{transform:translateX(0) scaleX(1)}
+}
 @keyframes swing{ from{transform:rotate(16deg)} to{transform:rotate(-16deg)} }
 
 /* ===== mléko a buchta ===== */
@@ -383,7 +390,7 @@ table.ref td.rd{font-style:italic}
             <line class="lever" x1="230" y1="70" x2="330" y2="70"/>
             <circle class="term" cx="230" cy="70" r="7"/><circle class="term" cx="330" cy="70" r="7"/>
             <text class="desig" x="280" y="46">S1</text>
-            <text class="swlabel" x="280" y="122">VYPÍNAČ A</text>
+            <text class="swlabel" x="280" y="124">A</text>
             <text class="swval" x="280" y="150">1</text>
             <rect class="hit" x="205" y="8" width="150" height="160"/>
           </g>
@@ -391,16 +398,16 @@ table.ref td.rd{font-style:italic}
             <line class="lever" x1="430" y1="70" x2="530" y2="70"/>
             <circle class="term" cx="430" cy="70" r="7"/><circle class="term" cx="530" cy="70" r="7"/>
             <text class="desig" x="480" y="46">S2</text>
-            <text class="swlabel" x="480" y="122">VYPÍNAČ B</text>
+            <text class="swlabel" x="480" y="124">B</text>
             <text class="swval" x="480" y="150">1</text>
             <rect class="hit" x="405" y="8" width="150" height="160"/>
           </g>
         </svg>
-        <p class="hint"><span><b>Schéma 01 · Sériové zapojení</b></span><span>Klikni na vypínač A nebo B &nbsp;·&nbsp; přepni <kbd>A</kbd> <kbd>B</kbd></span></p>
+        <p class="hint"><span><b>Schéma 01 · Sériové zapojení</b></span><span>Klikni na spínače &nbsp;·&nbsp; přepni <kbd>A</kbd> <kbd>B</kbd></span></p>
       </div>
     <div class="chips">
-          <div class="chip"><b>A</b> — sepnuto <span class="val is1" id="ser-va">1</span></div>
-          <div class="chip"><b>B</b> — sepnuto <span class="val is1" id="ser-vb">1</span></div>
+          <div class="chip"><b>A</b> <span class="val is1" id="ser-va">1</span></div>
+          <div class="chip"><b>B</b> <span class="val is1" id="ser-vb">1</span></div>
           <div class="chip"><b>A ∧ B</b> <span class="val is1" id="ser-vr">1</span></div>
         </div>
     <div class="verdict t" id="ser-verdict"><span class="res">Svítí.</span> Oba vypínače jsou sepnuté.</div>
@@ -454,7 +461,7 @@ table.ref td.rd{font-style:italic}
             <line class="lever" x1="330" y1="55" x2="430" y2="55"/>
             <circle class="term" cx="330" cy="55" r="7"/><circle class="term" cx="430" cy="55" r="7"/>
             <text class="desig" x="380" y="32">S1</text>
-            <text class="swlabel" x="380" y="100">VYPÍNAČ A</text>
+            <text class="swlabel" x="380" y="102">A</text>
             <text class="swval" x="380" y="127">1</text>
             <rect class="hit" x="305" y="0" width="150" height="140"/>
           </g>
@@ -462,16 +469,16 @@ table.ref td.rd{font-style:italic}
             <line class="lever" x1="330" y1="175" x2="430" y2="175"/>
             <circle class="term" cx="330" cy="175" r="7"/><circle class="term" cx="430" cy="175" r="7"/>
             <text class="desig" x="380" y="152">S2</text>
-            <text class="swlabel" x="380" y="220">VYPÍNAČ B</text>
+            <text class="swlabel" x="380" y="222">B</text>
             <text class="swval" x="380" y="247">1</text>
             <rect class="hit" x="305" y="140" width="150" height="130"/>
           </g>
         </svg>
-        <p class="hint"><span><b>Schéma 02 · Paralelní zapojení</b></span><span>Klikni na vypínač A nebo B &nbsp;·&nbsp; přepni <kbd>A</kbd> <kbd>B</kbd></span></p>
+        <p class="hint"><span><b>Schéma 02 · Paralelní zapojení</b></span><span>Klikni na spínače &nbsp;·&nbsp; přepni <kbd>A</kbd> <kbd>B</kbd></span></p>
       </div>
     <div class="chips">
-          <div class="chip"><b>A</b> — sepnuto <span class="val is1" id="par-va">1</span></div>
-          <div class="chip"><b>B</b> — sepnuto <span class="val is1" id="par-vb">1</span></div>
+          <div class="chip"><b>A</b> <span class="val is1" id="par-va">1</span></div>
+          <div class="chip"><b>B</b> <span class="val is1" id="par-vb">1</span></div>
           <div class="chip"><b>A ∨ B</b> <span class="val is1" id="par-vr">1</span></div>
         </div>
     <div class="verdict t" id="par-verdict"><span class="res">Svítí.</span> Proud teče oběma větvemi.</div>
@@ -506,14 +513,14 @@ table.ref td.rd{font-style:italic}
             </g>
             <rect class="hit" x="500" y="120" width="180" height="160"/>
           </g>
-          <text class="caption" x="170" y="300" id="imp-cap-milk">MLÉKO: ANO</text>
-          <text class="caption" x="590" y="300" id="imp-cap-cake">BUCHTA: ANO</text>
+          <text class="caption" x="170" y="300" id="imp-cap-milk">A · MLÉKO: ANO</text>
+          <text class="caption" x="590" y="300" id="imp-cap-cake">B · BUCHTA: ANO</text>
         </svg>
         <p class="hint"><span><b>Situace 03 · Slib</b></span><span>Klikni na mléko nebo na buchtu &nbsp;·&nbsp; přepni <kbd>A</kbd> <kbd>B</kbd></span></p>
       </div>
     <div class="chips">
-          <div class="chip"><b>A</b> — mléko <span class="val is1" id="imp-va">1</span></div>
-          <div class="chip"><b>B</b> — buchta <span class="val is1" id="imp-vb">1</span></div>
+          <div class="chip"><b>A</b> <span class="val is1" id="imp-va">1</span></div>
+          <div class="chip"><b>B</b> <span class="val is1" id="imp-vb">1</span></div>
           <div class="chip"><b>A ⇒ B</b> <span class="val is1" id="imp-vr">1</span></div>
         </div>
     <div class="verdict t" id="imp-verdict"><span class="res">Pravda.</span> Mléko dorazilo a buchta je na stole — slib byl splněn.</div>
@@ -524,24 +531,21 @@ table.ref td.rd{font-style:italic}
     <div class="kicker">Ekvivalence · interaktivně</div>
     <h2>„Chodec jde právě tehdy, když svítí zelená.“</h2>
     <div class="drawing">
-        <svg class="scene" viewBox="0 0 760 340" id="eq-scene" role="img" aria-label="Semafor a chodec na přechodu">
-          <rect x="250" y="20" width="420" height="300" fill="var(--road)"/>
-          <line x1="250" y1="20" x2="250" y2="320" stroke="var(--line)" stroke-width="3"/>
-          <line x1="670" y1="20" x2="670" y2="320" stroke="var(--line)" stroke-width="3"/>
+        <svg class="scene" viewBox="0 0 760 340" id="eq-scene" role="img" aria-label="Semafor a chodec na přechodu přes silnici">
+          <!-- pohled shora: chodník | silnice s přechodem | chodník -->
+          <rect x="230" y="8" width="410" height="292" fill="var(--road)"/>
+          <line x1="230" y1="8" x2="230" y2="300" stroke="var(--ink)" stroke-width="3"/>
+          <line x1="640" y1="8" x2="640" y2="300" stroke="var(--ink)" stroke-width="3"/>
+          <path d="M435,12 L435,98 M435,262 L435,296" fill="none" stroke="var(--stripe)"
+                stroke-width="5" stroke-dasharray="20 16"/>
           <g fill="var(--stripe)">
-            <rect x="262" y="140" width="396" height="16" rx="3"/>
-            <rect x="262" y="172" width="396" height="16" rx="3"/>
-            <rect x="262" y="204" width="396" height="16" rx="3"/>
-            <rect x="262" y="236" width="396" height="16" rx="3"/>
+            <rect x="240" y="110" width="390" height="18"/>
+            <rect x="240" y="140" width="390" height="18"/>
+            <rect x="240" y="170" width="390" height="18"/>
+            <rect x="240" y="200" width="390" height="18"/>
+            <rect x="240" y="230" width="390" height="18"/>
           </g>
-          <g id="eq-light">
-            <line x1="120" y1="200" x2="120" y2="310" stroke="var(--line)" stroke-width="8" stroke-linecap="round"/>
-            <rect x="82" y="60" width="76" height="140" fill="var(--panel)" stroke="var(--ink)" stroke-width="3"/>
-            <circle class="lamp red" cx="120" cy="100" r="24"/>
-            <circle class="lamp green" cx="120" cy="160" r="24"/>
-            <rect class="hit" x="72" y="50" width="96" height="270"/>
-          </g>
-          <g transform="translate(232,300)">
+          <g transform="translate(185,240)">
             <g class="walker" id="eq-walker">
               <circle cx="0" cy="-92" r="15" fill="var(--live)" stroke="none"/>
               <line x1="0" y1="-77" x2="0" y2="-34" stroke="var(--ink)" stroke-width="8" stroke-linecap="round"/>
@@ -551,15 +555,22 @@ table.ref td.rd{font-style:italic}
               <line class="limb leg2" x1="0" y1="-34" x2="16" y2="0" stroke="var(--ink)" stroke-width="8" stroke-linecap="round"/>
             </g>
           </g>
-          <rect class="hit" id="eq-walker-hit" x="180" y="190" width="120" height="130"/>
-          <text class="caption" x="120" y="336" id="eq-cap-light">SEMAFOR: ZELENÁ</text>
-          <text class="caption" x="460" y="336" id="eq-cap-walk">CHODEC: JDE</text>
+          <rect class="hit" id="eq-walker-hit" x="152" y="8" width="556" height="292"/>
+          <g id="eq-light">
+            <line x1="94" y1="180" x2="94" y2="272" stroke="var(--line)" stroke-width="8" stroke-linecap="round"/>
+            <rect x="56" y="40" width="76" height="140" fill="var(--panel)" stroke="var(--ink)" stroke-width="3"/>
+            <circle class="lamp red" cx="94" cy="80" r="24"/>
+            <circle class="lamp green" cx="94" cy="140" r="24"/>
+            <rect class="hit" x="44" y="30" width="104" height="250"/>
+          </g>
+          <text class="caption" x="150" y="334" id="eq-cap-light">A · SEMAFOR: ZELENÁ</text>
+          <text class="caption" x="470" y="334" id="eq-cap-walk">B · CHODEC: JDE</text>
         </svg>
         <p class="hint"><span><b>Situace 04 · Přechod</b></span><span>Klikni na semafor nebo na chodce &nbsp;·&nbsp; přepni <kbd>A</kbd> <kbd>B</kbd></span></p>
       </div>
     <div class="chips">
-          <div class="chip"><b>A</b> — zelená <span class="val is1" id="eq-va">1</span></div>
-          <div class="chip"><b>B</b> — jde <span class="val is1" id="eq-vb">1</span></div>
+          <div class="chip"><b>A</b> <span class="val is1" id="eq-va">1</span></div>
+          <div class="chip"><b>B</b> <span class="val is1" id="eq-vb">1</span></div>
           <div class="chip"><b>A ⇔ B</b> <span class="val is1" id="eq-vr">1</span></div>
         </div>
     <div class="verdict t" id="eq-verdict"><span class="res">Pravda.</span> Svítí zelená a chodec jde — obě hodnoty se shodují.</div>
@@ -751,8 +762,8 @@ table.ref td.rd{font-style:italic}
       var r = !a || b;
       milk.classList.toggle('absent', !a);
       cake.classList.toggle('absent', !b);
-      document.getElementById('imp-cap-milk').textContent = 'MLÉKO: ' + (a ? 'ANO' : 'NE');
-      document.getElementById('imp-cap-cake').textContent = 'BUCHTA: ' + (b ? 'ANO' : 'NE');
+      document.getElementById('imp-cap-milk').textContent = 'A · MLÉKO: ' + (a ? 'ANO' : 'NE');
+      document.getElementById('imp-cap-cake').textContent = 'B · BUCHTA: ' + (b ? 'ANO' : 'NE');
       setVal(document.getElementById('imp-va'), a);
       setVal(document.getElementById('imp-vb'), b);
       setVal(document.getElementById('imp-vr'), r);
@@ -779,8 +790,8 @@ table.ref td.rd{font-style:italic}
       green.classList.toggle('on', a);
       red.classList.toggle('on', !a);
       scene.classList.toggle('walking', b);
-      document.getElementById('eq-cap-light').textContent = 'SEMAFOR: ' + (a ? 'ZELENÁ' : 'ČERVENÁ');
-      document.getElementById('eq-cap-walk').textContent = 'CHODEC: ' + (b ? 'JDE' : 'STOJÍ');
+      document.getElementById('eq-cap-light').textContent = 'A · SEMAFOR: ' + (a ? 'ZELENÁ' : 'ČERVENÁ');
+      document.getElementById('eq-cap-walk').textContent = 'B · CHODEC: ' + (b ? 'JDE' : 'STOJÍ');
       setVal(document.getElementById('eq-va'), a);
       setVal(document.getElementById('eq-vb'), b);
       setVal(document.getElementById('eq-vr'), r);
