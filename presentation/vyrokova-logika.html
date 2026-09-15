@@ -16,12 +16,14 @@
 
 /* ===== tokeny: modrotisk / výkresový list ===== */
 :root{
-  --ink:#0E1B2E; --ink-2:#14243A; --ink-3:#1C3049;
-  --rule:#27405C; --rule-soft:#1D3450;
-  --chalk:#E7EEF6; --chalk-2:#94AABF; --chalk-3:#6C8299;
-  --live:#F0A93C; --live-soft:rgba(240,169,60,.13); --live-line:rgba(240,169,60,.45);
-  --fault:#D46A55;
-  --art:#5F7E9C;
+  --paper:#F1F4F8; --panel:#FFFFFF; --panel-2:#E9EEF4; --metal:#C3CEDA;
+  --rule:#C7D3E0; --rule-soft:#DEE6EE;
+  --ink:#13293F; --ink-2:#4E6580; --ink-3:#73879B; --line:#7289A0;
+  --text:#22384D;
+  --live:#C2760D; --live-bright:#E89A20; --live-soft:rgba(232,154,32,.16);
+  --live-line:rgba(194,118,13,.5);
+  --fault:#B23F2C;
+  --road:#DCE4EC; --stripe:#FFFFFF;
   --sans:'IBM Plex Sans',-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
   --disp:'Archivo','IBM Plex Sans',-apple-system,'Segoe UI',Arial,sans-serif;
   --mono:'IBM Plex Mono',ui-monospace,'Cascadia Code',Consolas,monospace;
@@ -30,7 +32,7 @@
 *{box-sizing:border-box}
 html,body{height:100%}
 body{
-  margin:0; background:var(--ink); color:var(--chalk);
+  margin:0; background:var(--paper); color:var(--ink);
   font-family:var(--sans); font-size:16px; overflow:hidden;
   -webkit-font-smoothing:antialiased;
 }
@@ -38,8 +40,8 @@ body{
 body::before{
   content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
   background:
-    repeating-linear-gradient(to right, rgba(231,238,246,.045) 0 1px, transparent 1px 48px),
-    repeating-linear-gradient(to bottom, rgba(231,238,246,.045) 0 1px, transparent 1px 48px);
+    repeating-linear-gradient(to right, rgba(19,41,63,.055) 0 1px, transparent 1px 48px),
+    repeating-linear-gradient(to bottom, rgba(19,41,63,.055) 0 1px, transparent 1px 48px);
 }
 /* rám listu */
 .deck::after{
@@ -51,7 +53,7 @@ body::before{
 .slide{
   position:absolute; inset:0; display:none;
   padding:clamp(24px,4vh,56px) clamp(28px,5vw,76px) calc(var(--bar) + 20px);
-  overflow-y:auto; opacity:0; transform:translateY(10px);
+  overflow-y:auto; touch-action:pan-y; opacity:0; transform:translateY(10px);
   transition:opacity .3s ease, transform .3s ease;
 }
 .slide.active{display:grid; align-content:start}
@@ -65,21 +67,21 @@ h1{font-family:var(--disp); font-weight:700; letter-spacing:-.025em; line-height
 h2{font-family:var(--disp); font-weight:700; letter-spacing:-.018em; line-height:1.08;
    font-size:clamp(27px,3.8vw,46px); margin:0 0 10px; text-wrap:balance}
 h3{font-family:var(--disp); font-weight:700; font-size:clamp(16px,1.7vw,20px);
-   letter-spacing:-.005em; margin:0 0 10px; color:var(--chalk)}
-p{font-size:clamp(15px,1.55vw,19px); line-height:1.62; color:#CBD8E6; margin:0 0 12px; max-width:68ch}
+   letter-spacing:-.005em; margin:0 0 10px; color:var(--ink)}
+p{font-size:clamp(15px,1.55vw,19px); line-height:1.62; color:var(--text); margin:0 0 12px; max-width:68ch}
 p:last-child{margin-bottom:0}
-.lead{color:var(--chalk-2)}
-b,strong{font-weight:600; color:var(--chalk)}
+.lead{color:var(--ink-2)}
+b,strong{font-weight:600; color:var(--ink)}
 ul{margin:0; padding-left:0; list-style:none}
-li{font-size:clamp(15px,1.5vw,18px); line-height:1.55; color:#CBD8E6; padding-left:20px;
+li{font-size:clamp(15px,1.5vw,18px); line-height:1.55; color:var(--text); padding-left:20px;
    position:relative; margin-bottom:9px}
 li:last-child{margin-bottom:0}
-li::before{content:""; position:absolute; left:0; top:.62em; width:9px; height:1px; background:var(--art)}
+li::before{content:""; position:absolute; left:0; top:.62em; width:9px; height:1px; background:var(--line)}
 
 /* popiska listu: ——— KONJUNKCE · SCHÉMA */
 .kicker{
   display:flex; align-items:center; gap:12px; font-family:var(--mono); font-weight:500;
-  font-size:11px; letter-spacing:.2em; text-transform:uppercase; color:var(--chalk-2);
+  font-size:11px; letter-spacing:.2em; text-transform:uppercase; color:var(--ink-2);
   margin:0 0 14px;
 }
 .kicker::before{content:""; width:34px; height:1px; background:var(--live); flex:none}
@@ -88,7 +90,7 @@ li::before{content:""; position:absolute; left:0; top:.62em; width:9px; height:1
 h2 .sym{font-size:.86em}
 
 /* ===== plochy ===== */
-.card{background:var(--ink-2); border:1px solid var(--rule); padding:20px 22px}
+.card{background:var(--panel); border:1px solid var(--rule); padding:20px 22px}
 .grid{display:grid; gap:20px}
 .g2{grid-template-columns:1fr 1fr}
 .g3{grid-template-columns:repeat(3,1fr)}
@@ -98,98 +100,100 @@ h2 .sym{font-size:.86em}
 table.tt{border-collapse:collapse; width:100%; font-variant-numeric:tabular-nums}
 table.tt th{
   font-family:var(--mono); font-weight:500; font-size:11px; letter-spacing:.16em;
-  text-transform:uppercase; color:var(--chalk-2); text-align:center; padding:0 10px 9px;
+  text-transform:uppercase; color:var(--ink-2); text-align:center; padding:0 10px 9px;
   border-bottom:1px solid var(--rule); white-space:nowrap;
 }
 table.tt td{
   font-size:clamp(14px,1.45vw,17px); text-align:center; padding:9px 10px;
-  border-bottom:1px solid var(--rule-soft); color:#CBD8E6; transition:background .18s, color .18s;
+  border-bottom:1px solid var(--rule-soft); color:var(--text); transition:background .18s, color .18s;
 }
 table.tt tr:last-child td{border-bottom:0}
 table.tt th:nth-child(3),table.tt td:nth-child(3){border-left:1px solid var(--rule)}
+table.tt.wide th:nth-child(3),table.tt.wide td:nth-child(3){border-left:0}
+table.tt.wide th:nth-child(4),table.tt.wide td:nth-child(4){border-left:1px solid var(--rule)}
 table.tt td.res{font-family:var(--mono); font-weight:500}
 table.tt td.v1,table.tt td.v0{font-family:var(--mono); font-weight:500}
 table.tt td.v1{color:var(--live)}
-table.tt td.v0{color:var(--chalk-3)}
+table.tt td.v0{color:var(--ink-3)}
 table.tt tr.on td{background:var(--live-soft)}
 table.tt tr.on td:first-child{box-shadow:inset 3px 0 0 var(--live)}
 
 /* ===== odečet hodnot ===== */
-.chips{display:flex; flex-wrap:wrap; gap:0; margin:0 0 16px; border:1px solid var(--rule); background:var(--ink-2)}
+.chips{display:flex; flex-wrap:wrap; gap:0; margin:0 0 16px; border:1px solid var(--rule); background:var(--panel)}
 .chip{
   display:flex; align-items:center; gap:10px; padding:11px 16px; flex:1 1 auto;
   font-family:var(--mono); font-size:12px; letter-spacing:.09em; text-transform:uppercase;
-  color:var(--chalk-2); border-right:1px solid var(--rule); white-space:nowrap;
+  color:var(--ink-2); border-right:1px solid var(--rule); white-space:nowrap;
 }
 .chip:last-child{border-right:0}
-.chip b{font-weight:500; color:var(--chalk); letter-spacing:.14em}
+.chip b{font-weight:500; color:var(--ink); letter-spacing:.14em}
 .val{
   font-family:var(--mono); font-weight:500; font-size:15px; min-width:26px; text-align:center;
   padding:1px 7px; border:1px solid transparent;
 }
 .val.is1{color:var(--live); border-color:var(--live-line); background:var(--live-soft)}
-.val.is0{color:var(--chalk-3); border-color:var(--rule)}
+.val.is0{color:var(--ink-3); border-color:var(--rule)}
 
 .verdict{
-  border:1px solid var(--rule); border-left-width:3px; background:var(--ink-2);
-  padding:14px 18px; font-size:clamp(15px,1.5vw,18px); line-height:1.5; color:#CBD8E6;
+  border:1px solid var(--rule); border-left-width:3px; background:var(--panel);
+  padding:14px 18px; font-size:clamp(15px,1.5vw,18px); line-height:1.5; color:var(--text);
 }
-.verdict .res{font-family:var(--disp); font-weight:700; color:var(--chalk); letter-spacing:-.01em}
+.verdict .res{font-family:var(--disp); font-weight:700; color:var(--ink); letter-spacing:-.01em}
 .verdict.t{border-left-color:var(--live)}
 .verdict.f{border-left-color:var(--fault)}
 .verdict.f .res{color:var(--fault)}
 
 button.tgl{
   font-family:var(--mono); font-size:12px; letter-spacing:.12em; text-transform:uppercase;
-  cursor:pointer; background:transparent; color:var(--chalk); border:1px solid var(--rule);
+  cursor:pointer; background:transparent; color:var(--ink); border:1px solid var(--rule);
   padding:10px 16px; transition:background .15s, border-color .15s;
 }
-button.tgl:hover{background:var(--ink-3); border-color:var(--art)}
+button.tgl:hover{background:var(--panel-2); border-color:var(--line)}
 :focus-visible{outline:2px solid var(--live); outline-offset:2px}
 
 /* ===== kreslicí plocha + popisové pole ===== */
-.drawing{border:1px solid var(--rule); background:var(--ink-2)}
+.drawing{border:1px solid var(--rule); background:var(--panel)}
 .drawing svg.scene{display:block; padding:14px 16px 4px}
 .drawing .hint{
   display:flex; flex-wrap:wrap; gap:8px 18px; justify-content:space-between; align-items:baseline;
   margin:0; padding:9px 14px; border-top:1px solid var(--rule);
   font-family:var(--mono); font-size:10.5px; letter-spacing:.14em; text-transform:uppercase;
-  color:var(--chalk-3);
+  color:var(--ink-3);
 }
-.drawing .hint b{color:var(--chalk-2); font-weight:500}
+.drawing .hint b{color:var(--ink-2); font-weight:500}
 svg.scene{width:100%; height:auto; touch-action:manipulation}
 
 /* ===== schéma ===== */
-.wire{fill:none; stroke:var(--art); stroke-width:5; stroke-linecap:round; stroke-linejoin:round}
-.flow{fill:none; stroke:var(--live); stroke-width:5; stroke-linecap:round; stroke-linejoin:round;
+.wire{fill:none; stroke:var(--line); stroke-width:5; stroke-linecap:round; stroke-linejoin:round}
+.flow{fill:none; stroke:var(--live-bright); stroke-width:5; stroke-linecap:round; stroke-linejoin:round;
       stroke-dasharray:9 21; opacity:0; transition:opacity .2s}
-.seg.live .wire{stroke:#7D9BB8}
+.seg.live .wire{stroke:var(--ink)}
 .seg.live .flow{opacity:1; animation:dash .85s linear infinite}
 @keyframes dash{ from{stroke-dashoffset:60} to{stroke-dashoffset:0} }
-.lever{stroke:var(--chalk); stroke-width:6; stroke-linecap:round; transition:transform .18s ease}
+.lever{stroke:var(--ink); stroke-width:6; stroke-linecap:round; transition:transform .18s ease}
 .sw.on .lever{stroke:var(--live)}
-.term{fill:var(--ink-2); stroke:var(--chalk-2); stroke-width:3}
+.term{fill:var(--panel); stroke:var(--ink-2); stroke-width:2.5}
 .hit{fill:transparent; cursor:pointer}
-.swlabel{fill:var(--chalk); font-family:var(--mono); font-weight:500; font-size:15px;
+.swlabel{fill:var(--ink); font-family:var(--mono); font-weight:500; font-size:15px;
          letter-spacing:.1em; text-anchor:middle; pointer-events:none; text-transform:uppercase}
 .swval{font-family:var(--mono); font-weight:500; font-size:20px; text-anchor:middle; pointer-events:none}
-.desig{fill:var(--chalk-3); font-family:var(--mono); font-weight:500; font-size:12px; letter-spacing:.1em}
-.batt{stroke:var(--chalk); stroke-width:4; stroke-linecap:round}
-.bulbglass{fill:var(--ink-3); stroke:var(--chalk-2); stroke-width:3; transition:fill .25s, stroke .25s}
-.lit .bulbglass{fill:var(--live); stroke:#FFD79A}
-.filament{fill:none; stroke:var(--chalk-2); stroke-width:3; transition:stroke .25s}
-.lit .filament{stroke:#7A4A05}
+.desig{fill:var(--ink-2); font-family:var(--mono); font-weight:500; font-size:12px; letter-spacing:.1em}
+.batt{stroke:var(--ink); stroke-width:4; stroke-linecap:round}
+.bulbglass{fill:var(--panel); stroke:var(--ink-2); stroke-width:3; transition:fill .25s, stroke .25s}
+.lit .bulbglass{fill:#F8C24E; stroke:var(--live)}
+.filament{fill:none; stroke:var(--ink-2); stroke-width:3; transition:stroke .25s}
+.lit .filament{stroke:#6B4405}
 .glow{opacity:0; transition:opacity .3s}
 .lit .glow{opacity:1}
-.caption{fill:var(--chalk-3); font-family:var(--mono); font-weight:500; font-size:11px;
+.caption{fill:var(--ink-2); font-family:var(--mono); font-weight:500; font-size:11px;
          letter-spacing:.14em; text-anchor:middle; text-transform:uppercase}
 
 /* ===== semafor a chodec ===== */
-.lamp{fill:#22364F; stroke:var(--ink); stroke-width:3; transition:fill .2s, filter .2s}
-.lamp.on.red{fill:#E05743; filter:drop-shadow(0 0 13px rgba(224,87,67,.85))}
-.lamp.on.green{fill:#46B97F; filter:drop-shadow(0 0 13px rgba(70,185,127,.85))}
+.lamp{fill:var(--panel-2); stroke:var(--rule); stroke-width:3; transition:fill .2s, filter .2s}
+.lamp.on.red{fill:#D8412C; filter:drop-shadow(0 0 13px rgba(216,65,44,.6))}
+.lamp.on.green{fill:#1E9E63; filter:drop-shadow(0 0 13px rgba(30,158,99,.55))}
 #eq-light .hit{cursor:pointer}
-.walker{transform:translateX(0); filter:drop-shadow(0 0 5px rgba(14,27,46,.95))}
+.walker{transform:translateX(0); filter:drop-shadow(0 0 4px rgba(255,255,255,.95))}
 .walking .walker{animation:cross 5s linear infinite}
 .walking .limb{transform-box:fill-box; transform-origin:top center; animation:swing .55s ease-in-out infinite alternate}
 .walking .arm2,.walking .leg2{animation-direction:alternate-reverse}
@@ -202,44 +206,60 @@ svg.scene{width:100%; height:auto; touch-action:manipulation}
 .obj .hit{cursor:pointer}
 
 /* ===== logické hradlo (IEC) ===== */
-.gate{fill:none; stroke:var(--chalk-2); stroke-width:3}
-.gate-t{fill:var(--chalk); font-family:var(--mono); font-weight:500; font-size:22px; text-anchor:middle}
-.gate-p{fill:var(--chalk-2); font-family:var(--mono); font-weight:500; font-size:15px}
+.gate{fill:none; stroke:var(--ink-2); stroke-width:3}
+.gate-t{fill:var(--ink); font-family:var(--mono); font-weight:500; font-size:22px; text-anchor:middle}
+.gate-p{fill:var(--ink-2); font-family:var(--mono); font-weight:500; font-size:15px}
 
 /* ===== popisové pole dole ===== */
+.navbtn{display:none}
+@media (pointer:coarse), (max-width:780px){
+  .navbtn{
+    display:flex; position:fixed; z-index:8; align-items:center; justify-content:center;
+    bottom:calc(var(--bar) + 16px + env(safe-area-inset-bottom, 0px));
+    width:58px; height:58px; border:1px solid var(--rule); background:var(--panel);
+    color:var(--ink); font-family:var(--mono); font-size:22px; line-height:1; cursor:pointer;
+    box-shadow:0 3px 14px rgba(19,41,63,.16); -webkit-tap-highlight-color:transparent;
+  }
+  #nav-prev{left:16px} #nav-next{right:16px}
+  .navbtn:active{background:var(--panel-2)}
+  /* listování obstarají plovoucí tlačítka, v liště by se lámala na dva řádky */
+  #btn-prev,#btn-next{display:none}
+  .counter{border-right:0}
+  .slide{padding-bottom:calc(var(--bar) + 96px)}
+}
 .progress{position:fixed; top:0; left:0; height:2px; background:var(--live); width:0;
           transition:width .3s ease; z-index:6}
 .bar{
   position:fixed; left:0; right:0; bottom:0; height:var(--bar); z-index:5;
-  display:flex; align-items:stretch; background:var(--ink); border-top:1px solid var(--rule);
+  display:flex; align-items:stretch; background:var(--panel); border-top:1px solid var(--rule);
   padding-bottom:env(safe-area-inset-bottom, 0px);
 }
 .bar button{
   font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase;
-  cursor:pointer; background:transparent; color:var(--chalk-2); border:0;
+  cursor:pointer; background:transparent; color:var(--ink-2); border:0;
   border-right:1px solid var(--rule); padding:0 18px; transition:background .15s, color .15s;
 }
-.bar button:hover{background:var(--ink-2); color:var(--chalk)}
+.bar button:hover{background:var(--panel); color:var(--ink)}
 #btn-fs{border-right:0; border-left:1px solid var(--rule)}
 .counter{
   display:flex; align-items:center; padding:0 18px; border-right:1px solid var(--rule);
   font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase;
-  color:var(--chalk); font-variant-numeric:tabular-nums; white-space:nowrap;
+  color:var(--ink); font-variant-numeric:tabular-nums; white-space:nowrap;
 }
-.counter i{font-style:normal; color:var(--chalk-3)}
+.counter i{font-style:normal; color:var(--ink-3)}
 .bar .spacer{flex:1; display:flex; align-items:center; padding:0 18px;
-  font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--chalk-3)}
+  font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-3)}
 .keys{display:flex; align-items:center; gap:8px; padding:0 18px; border-left:1px solid var(--rule);
-  font-family:var(--mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--chalk-3)}
-kbd{font-family:var(--mono); font-size:10px; letter-spacing:.08em; background:var(--ink-2);
-    border:1px solid var(--rule); padding:3px 6px; color:var(--chalk-2)}
+  font-family:var(--mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3)}
+kbd{font-family:var(--mono); font-size:10px; letter-spacing:.08em; background:var(--panel-2);
+    border:1px solid var(--rule); padding:3px 6px; color:var(--ink-2)}
 p.keys{border:0; padding:0; display:block; line-height:2.1; letter-spacing:.12em; max-width:none}
 
 @media (max-width:780px){
   .bar .spacer{display:none}
   .keys{display:none}
   .bar button{padding:0 14px}
-  .slide{padding-bottom:calc(var(--bar) + 40px)}
+  .slide{padding-bottom:calc(var(--bar) + 96px)}
   .deck::after{display:none}
   .chips{flex-direction:column}
   .chip{border-right:0; border-bottom:1px solid var(--rule)}
@@ -259,8 +279,29 @@ p.keys{border:0; padding:0; display:block; line-height:2.1; letter-spacing:.12em
          border-top:1px solid var(--rule)}
 .gatefig{width:clamp(180px,17vw,235px); height:auto; flex:none}
 .gatecap{font-family:var(--mono); font-weight:500; font-size:10.5px; letter-spacing:.14em;
-         text-transform:uppercase; color:var(--chalk-3); margin:0; max-width:24ch; line-height:1.8}
+         text-transform:uppercase; color:var(--ink-3); margin:0; max-width:24ch; line-height:1.8}
 .card p{max-width:58ch}
+.note{border:1px solid var(--rule); border-left:3px solid var(--live); background:var(--panel);
+      padding:14px 18px; font-size:clamp(15px,1.5vw,18px); line-height:1.55; color:var(--text)}
+.note b{color:var(--ink)}
+.exq{font-family:var(--disp); font-weight:700; color:var(--ink); margin:0 0 9px; max-width:none;
+     font-size:clamp(16px,1.75vw,20px); line-height:1.25; text-wrap:balance}
+.exv{font-family:var(--mono); font-weight:500; font-size:10.5px; letter-spacing:.13em;
+     text-transform:uppercase; color:var(--ink-3); margin:0 0 11px; max-width:none}
+.exv b{color:var(--live); font-weight:500}
+.exa{margin:0; font-size:clamp(14px,1.4vw,16.5px); line-height:1.55; max-width:none}
+.exr{font-family:var(--mono); font-weight:500; color:var(--live); white-space:nowrap}
+.tablewrap{overflow-x:auto}
+table.ref{border-collapse:collapse; width:100%; min-width:620px}
+table.ref th{font-family:var(--mono); font-weight:500; font-size:11px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--ink-2); text-align:left; padding:0 14px 10px;
+  border-bottom:1px solid var(--rule); white-space:nowrap}
+table.ref td{padding:12px 14px; border-bottom:1px solid var(--rule-soft); color:var(--text);
+  font-size:clamp(14px,1.4vw,17px); vertical-align:baseline}
+table.ref tr:last-child td{border-bottom:0}
+table.ref td.nm{font-family:var(--disp); font-weight:700; color:var(--ink); white-space:nowrap}
+table.ref td.zn{font-family:var(--mono); font-weight:500; color:var(--live); white-space:nowrap; font-size:1.05em}
+table.ref td.rd{font-style:italic}
 .ops{display:grid; grid-template-columns:repeat(4,1fr); max-width:780px; margin:34px 0 30px;
      border-top:1px solid var(--rule); border-bottom:1px solid var(--rule)}
 .op{text-align:center; padding:20px 6px 17px; border-right:1px solid var(--rule)}
@@ -268,11 +309,11 @@ p.keys{border:0; padding:0; display:block; line-height:2.1; letter-spacing:.12em
 .opg{display:block; font-family:var(--mono); font-weight:500; line-height:1; color:var(--live);
      font-size:clamp(28px,3.4vw,40px); margin-bottom:12px}
 .opn{font-family:var(--mono); font-weight:500; font-size:10.5px; letter-spacing:.16em;
-     text-transform:uppercase; color:var(--chalk-2)}
+     text-transform:uppercase; color:var(--ink-2)}
 .minilabel{font-family:var(--mono); font-weight:500; font-size:10.5px; letter-spacing:.2em;
-           text-transform:uppercase; color:var(--chalk-2); margin:0 0 14px}
+           text-transform:uppercase; color:var(--ink-2); margin:0 0 14px}
 .keysgrid{display:flex; flex-wrap:wrap; gap:11px 26px; font-family:var(--mono); font-weight:500;
-          font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--chalk-3)}
+          font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-3)}
 .keysgrid span{display:inline-flex; align-items:center; gap:7px; white-space:nowrap}
 @media (max-width:640px){ .ops{grid-template-columns:repeat(2,1fr)} .op:nth-child(2){border-right:0}
   .op:nth-child(1),.op:nth-child(2){border-bottom:1px solid var(--rule)} }
@@ -280,6 +321,8 @@ p.keys{border:0; padding:0; display:block; line-height:2.1; letter-spacing:.12em
 </head>
 <body>
 <div class="progress" id="progress"></div>
+<button class="navbtn" id="nav-prev" type="button" aria-label="Předchozí snímek">←</button>
+<button class="navbtn" id="nav-next" type="button" aria-label="Další snímek">→</button>
 <div class="deck" id="deck">
 
 <!-- 1 -->
@@ -411,7 +454,7 @@ p.keys{border:0; padding:0; display:block; line-height:2.1; letter-spacing:.12em
       <div class="drawing">
         <svg class="scene" viewBox="0 0 760 340" role="img" aria-label="Sériové zapojení dvou vypínačů">
           <defs>
-            <radialGradient id="glowA"><stop offset="0%" stop-color="#F0A93C" stop-opacity=".75"/><stop offset="100%" stop-color="#F0A93C" stop-opacity="0"/></radialGradient>
+            <radialGradient id="glowA"><stop offset="0%" stop-color="var(--live-bright)" stop-opacity=".75"/><stop offset="100%" stop-color="var(--live-bright)" stop-opacity="0"/></radialGradient>
           </defs>
           <g class="seg" id="ser-seg">
             <path class="wire" d="M70,150 L70,70 L230,70"/><path class="flow" d="M70,150 L70,70 L230,70"/>
@@ -430,7 +473,7 @@ p.keys{border:0; padding:0; display:block; line-height:2.1; letter-spacing:.12em
           </g>
           <g id="ser-bulb">
             <circle class="glow" cx="660" cy="175" r="95" fill="url(#glowA)"/>
-            <rect x="645" y="203" width="30" height="14" rx="3" fill="var(--ink-3)"/>
+            <rect x="645" y="203" width="30" height="14" rx="3" fill="var(--metal)"/>
             <circle class="bulbglass" cx="660" cy="175" r="35"/>
             <path class="filament" d="M648,188 C652,164 668,164 672,188"/>
             <text class="desig" x="706" y="88">HL1</text>
@@ -527,7 +570,7 @@ p.keys{border:0; padding:0; display:block; line-height:2.1; letter-spacing:.12em
       <div class="drawing">
         <svg class="scene" viewBox="0 0 760 360" role="img" aria-label="Paralelní zapojení dvou vypínačů">
           <defs>
-            <radialGradient id="glowB"><stop offset="0%" stop-color="#F0A93C" stop-opacity=".75"/><stop offset="100%" stop-color="#F0A93C" stop-opacity="0"/></radialGradient>
+            <radialGradient id="glowB"><stop offset="0%" stop-color="var(--live-bright)" stop-opacity=".75"/><stop offset="100%" stop-color="var(--live-bright)" stop-opacity="0"/></radialGradient>
           </defs>
           <g class="seg" id="par-shared">
             <path class="wire" d="M70,150 L70,115 L230,115"/><path class="flow" d="M70,150 L70,115 L230,115"/>
@@ -557,7 +600,7 @@ p.keys{border:0; padding:0; display:block; line-height:2.1; letter-spacing:.12em
           </g>
           <g id="par-bulb">
             <circle class="glow" cx="660" cy="190" r="95" fill="url(#glowB)"/>
-            <rect x="645" y="218" width="30" height="14" rx="3" fill="var(--ink-3)"/>
+            <rect x="645" y="218" width="30" height="14" rx="3" fill="var(--metal)"/>
             <circle class="bulbglass" cx="660" cy="190" r="35"/>
             <path class="filament" d="M648,203 C652,179 668,179 672,203"/>
             <text class="desig" x="706" y="100">HL1</text>
@@ -643,25 +686,25 @@ p.keys{border:0; padding:0; display:block; line-height:2.1; letter-spacing:.12em
       <div class="drawing">
         <svg class="scene" viewBox="0 0 760 320" role="img" aria-label="Mléko a buchta">
           <g class="obj" id="imp-milk">
-            <g class="art" fill="none" stroke="#E7EEF6" stroke-width="3.5" stroke-linejoin="round">
+            <g class="art" fill="none" stroke="var(--ink)" stroke-width="3.5" stroke-linejoin="round">
               <path d="M110,120 L170,64 L230,120"/>
               <path d="M110,120 L110,260 L230,260 L230,120 Z"/>
-              <path d="M170,64 L170,120" stroke="#5F7E9C" stroke-width="2.5" stroke-dasharray="6 7"/>
-              <rect x="128" y="156" width="84" height="54" stroke="#5F7E9C" stroke-width="2.5"/>
-              <text x="170" y="191" text-anchor="middle" fill="#E7EEF6" stroke="none"
+              <path d="M170,64 L170,120" stroke="var(--line)" stroke-width="2.5" stroke-dasharray="6 7"/>
+              <rect x="128" y="156" width="84" height="54" stroke="var(--line)" stroke-width="2.5"/>
+              <text x="170" y="191" text-anchor="middle" fill="var(--ink)" stroke="none"
                     style="font-family:var(--mono);font-weight:500;font-size:19px;letter-spacing:.12em">MLÉKO</text>
             </g>
             <rect class="hit" x="96" y="50" width="150" height="225"/>
           </g>
           <text x="380" y="182" text-anchor="middle" style="font-family:var(--mono);font-weight:500;font-size:58px;fill:var(--live)">⇒</text>
           <g class="obj" id="imp-cake">
-            <g class="art" fill="none" stroke="#E7EEF6" stroke-width="3.5" stroke-linejoin="round">
-              <ellipse cx="590" cy="264" rx="112" ry="13" stroke="#5F7E9C" stroke-width="2.5"/>
+            <g class="art" fill="none" stroke="var(--ink)" stroke-width="3.5" stroke-linejoin="round">
+              <ellipse cx="590" cy="264" rx="112" ry="13" stroke="var(--line)" stroke-width="2.5"/>
               <path d="M512,170 L512,252 L668,252 L668,170"/>
               <path d="M512,152 H668 V186 q-19.5,20 -39,0 q-19.5,20 -39,0 q-19.5,20 -39,0 q-19.5,20 -39,0 Z"/>
-              <path d="M530,206 v40 M570,214 v34 M610,214 v34 M650,206 v40" stroke="#5F7E9C" stroke-width="2"/>
+              <path d="M530,206 v40 M570,214 v34 M610,214 v34 M650,206 v40" stroke="var(--line)" stroke-width="2"/>
               <path d="M590,136 q11,-15 19,-17" stroke-linecap="round"/>
-              <circle cx="590" cy="142" r="12" fill="#F0A93C" stroke="#F0A93C"/>
+              <circle cx="590" cy="142" r="12" fill="var(--live)" stroke="var(--live)"/>
             </g>
             <rect class="hit" x="500" y="120" width="180" height="160"/>
           </g>
@@ -686,6 +729,45 @@ p.keys{border:0; padding:0; display:block; line-height:2.1; letter-spacing:.12em
           </table>
         </div>
         <div class="verdict t" id="imp-verdict"><span class="res">Pravda.</span> Mléko dorazilo a buchta je na stole — slib byl splněn.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- implikace: další příklady -->
+<section class="slide">
+  <div class="wrap">
+    <div class="kicker">Implikace · další příklady</div>
+    <h2>Test: „Vadí nám to?“</h2>
+    <p class="lead">U implikace se ptáme na jedinou věc: <b>stalo se něco, co by slib porušilo?</b>
+      Porušit ho jde jen jedním způsobem — předpoklad platí a závěr ne. Ve všech ostatních
+      případech odpovídáme „nevadí“, a výrok je tedy pravdivý.</p>
+    <div class="grid g2" style="margin-top:18px">
+      <div class="card">
+        <p class="exq">„Když přineseš mléko, bude buchta.“</p>
+        <p class="exv"><b>A</b> přineseš mléko · <b>B</b> bude buchta</p>
+        <p class="exa">Mléko jsi nepřinesl, ale buchta na stole je. Vadí nám, že je buchta?
+          Ne — nikdo neslíbil, že <i>bez</i> mléka buchta nebude. <span class="exr">A ⇒ B = 1</span></p>
+      </div>
+      <div class="card">
+        <p class="exq">„Když bude svítit slunce, půjdeme na výlet.“</p>
+        <p class="exv"><b>A</b> svítí slunce · <b>B</b> jdeme na výlet</p>
+        <p class="exa">Bylo zataženo a na výlet jsme šli stejně — nevadí, o zataženém dni slib nic
+          neříkal <span class="exr">= 1</span>. Slunce svítilo a nešli jsme — <b>to</b> je porušený
+          slib <span class="exr">= 0</span>.</p>
+      </div>
+      <div class="card">
+        <p class="exq">„Je-li číslo dělitelné šesti, je dělitelné třemi.“</p>
+        <p class="exv"><b>A</b> dělitelné 6 · <b>B</b> dělitelné 3</p>
+        <p class="exa">Zkus najít číslo, které je dělitelné šesti a není třemi. Nenajdeš — proto
+          implikace platí pro každé číslo. <span class="exr">A ⇒ B = 1</span></p>
+      </div>
+      <div class="card">
+        <p class="exq">„Když 2 + 2 = 5, jsem papež.“</p>
+        <p class="exv"><b>A</b> 2 + 2 = 5 · <b>B</b> jsem papež</p>
+        <p class="exa">Předpoklad neplatí, takže situace, které se slib týkal, nikdy nenastane a nejde
+          ho porušit. Celý výrok je <b>pravdivý</b> — z nepravdy plyne cokoli.
+          <span class="exr">A ⇒ B = 1</span></p>
       </div>
     </div>
   </div>
@@ -730,18 +812,18 @@ p.keys{border:0; padding:0; display:block; line-height:2.1; letter-spacing:.12em
     <div class="grid g2" style="grid-template-columns:1.55fr 1fr;align-items:start">
       <div class="drawing">
         <svg class="scene" viewBox="0 0 760 340" id="eq-scene" role="img" aria-label="Semafor a chodec na přechodu">
-          <rect x="250" y="20" width="420" height="300" fill="#19304C"/>
-          <line x1="250" y1="20" x2="250" y2="320" stroke="#5F7E9C" stroke-width="3"/>
-          <line x1="670" y1="20" x2="670" y2="320" stroke="#5F7E9C" stroke-width="3"/>
-          <g fill="#E7EEF6" opacity=".3">
+          <rect x="250" y="20" width="420" height="300" fill="var(--road)"/>
+          <line x1="250" y1="20" x2="250" y2="320" stroke="var(--line)" stroke-width="3"/>
+          <line x1="670" y1="20" x2="670" y2="320" stroke="var(--line)" stroke-width="3"/>
+          <g fill="var(--stripe)">
             <rect x="262" y="140" width="396" height="16" rx="3"/>
             <rect x="262" y="172" width="396" height="16" rx="3"/>
             <rect x="262" y="204" width="396" height="16" rx="3"/>
             <rect x="262" y="236" width="396" height="16" rx="3"/>
           </g>
           <g id="eq-light">
-            <line x1="120" y1="200" x2="120" y2="310" stroke="#5F7E9C" stroke-width="8" stroke-linecap="round"/>
-            <rect x="82" y="60" width="76" height="140" fill="var(--ink-3)" stroke="#E7EEF6" stroke-width="3"/>
+            <line x1="120" y1="200" x2="120" y2="310" stroke="var(--line)" stroke-width="8" stroke-linecap="round"/>
+            <rect x="82" y="60" width="76" height="140" fill="var(--panel)" stroke="var(--ink)" stroke-width="3"/>
             <circle class="lamp red" cx="120" cy="100" r="24"/>
             <circle class="lamp green" cx="120" cy="160" r="24"/>
             <rect class="hit" x="72" y="50" width="96" height="270"/>
@@ -749,11 +831,11 @@ p.keys{border:0; padding:0; display:block; line-height:2.1; letter-spacing:.12em
           <g transform="translate(232,300)">
             <g class="walker" id="eq-walker">
               <circle cx="0" cy="-92" r="15" fill="var(--live)" stroke="none"/>
-              <line x1="0" y1="-77" x2="0" y2="-34" stroke="#E7EEF6" stroke-width="8" stroke-linecap="round"/>
-              <line class="limb arm1" x1="0" y1="-66" x2="-20" y2="-44" stroke="#E7EEF6" stroke-width="7" stroke-linecap="round"/>
-              <line class="limb arm2" x1="0" y1="-66" x2="20" y2="-44" stroke="#E7EEF6" stroke-width="7" stroke-linecap="round"/>
-              <line class="limb leg1" x1="0" y1="-34" x2="-16" y2="0" stroke="#E7EEF6" stroke-width="8" stroke-linecap="round"/>
-              <line class="limb leg2" x1="0" y1="-34" x2="16" y2="0" stroke="#E7EEF6" stroke-width="8" stroke-linecap="round"/>
+              <line x1="0" y1="-77" x2="0" y2="-34" stroke="var(--ink)" stroke-width="8" stroke-linecap="round"/>
+              <line class="limb arm1" x1="0" y1="-66" x2="-20" y2="-44" stroke="var(--ink)" stroke-width="7" stroke-linecap="round"/>
+              <line class="limb arm2" x1="0" y1="-66" x2="20" y2="-44" stroke="var(--ink)" stroke-width="7" stroke-linecap="round"/>
+              <line class="limb leg1" x1="0" y1="-34" x2="-16" y2="0" stroke="var(--ink)" stroke-width="8" stroke-linecap="round"/>
+              <line class="limb leg2" x1="0" y1="-34" x2="16" y2="0" stroke="var(--ink)" stroke-width="8" stroke-linecap="round"/>
             </g>
           </g>
           <rect class="hit" id="eq-walker-hit" x="180" y="190" width="120" height="130"/>
@@ -783,19 +865,84 @@ p.keys{border:0; padding:0; display:block; line-height:2.1; letter-spacing:.12em
   </div>
 </section>
 
+<!-- ekvivalence: další příklady -->
+<section class="slide">
+  <div class="wrap">
+    <div class="kicker">Ekvivalence · další příklady</div>
+    <h2>Test: „Jde jedno bez druhého?“</h2>
+    <p class="lead">Ekvivalence platí jen tehdy, když obě věty chodí <b>vždycky spolu</b>. Stačí najít
+      jediný případ, kdy platí jedna a druhá ne, a ekvivalence padá — i když implikace jedním
+      směrem klidně dál platí.</p>
+    <div class="grid g2" style="margin-top:18px">
+      <div class="card">
+        <p class="exq">„Žárovka svítí právě tehdy, když je vypínač sepnutý.“</p>
+        <p class="exv"><b>A</b> svítí · <b>B</b> sepnuto</p>
+        <p class="exa">Jedno bez druhého nenastane ani v jednom směru. <span class="exr">A ⇔ B = 1</span></p>
+      </div>
+      <div class="card">
+        <p class="exq">„Číslo je sudé právě tehdy, když končí 0, 2, 4, 6 nebo 8.“</p>
+        <p class="exv"><b>A</b> sudé · <b>B</b> končí sudou číslicí</p>
+        <p class="exa">Platí to oběma směry, proto je to definice, ne jen pravidlo.
+          <span class="exr">A ⇔ B = 1</span></p>
+      </div>
+      <div class="card">
+        <p class="exq">„Prší právě tehdy, když je mokrý chodník.“</p>
+        <p class="exv"><b>A</b> prší · <b>B</b> mokrý chodník</p>
+        <p class="exa">Chodník může být mokrý od kropicího vozu — jeden směr selže.
+          <span class="exr">A ⇔ B = 0</span>, ale „prší ⇒ mokrý chodník“ pořád platí.</p>
+      </div>
+      <div class="card">
+        <p class="exq">„Zkoušku uděláš právě tehdy, když získáš aspoň 60 bodů.“</p>
+        <p class="exv"><b>A</b> uděláš zkoušku · <b>B</b> aspoň 60 bodů</p>
+        <p class="exa">Body jsou podmínka <b>nutná</b> (bez nich to nejde) i <b>postačující</b>
+          (s nimi to vyjde). Přesně to znamená ekvivalence. <span class="exr">A ⇔ B = 1</span></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- zápis a čtení -->
+<section class="slide">
+  <div class="wrap">
+    <div class="kicker">Přehled</div>
+    <h2>Zápis, čtení a kdy co platí</h2>
+    <div class="card" style="margin-top:18px; padding:20px 8px">
+      <div class="tablewrap">
+        <table class="ref">
+          <tr><th>Spojka</th><th>Znak</th><th>Čteme nahlas</th><th>Pravdivá, když</th><th>Nepravdivá, když</th></tr>
+          <tr><td class="nm">Negace</td><td class="zn">¬A</td><td class="rd">„ne A“, „neplatí A“</td>
+              <td>A neplatí</td><td>A platí</td></tr>
+          <tr><td class="nm">Konjunkce</td><td class="zn">A ∧ B</td><td class="rd">„A a zároveň B“</td>
+              <td>platí obojí</td><td>aspoň jedno neplatí</td></tr>
+          <tr><td class="nm">Disjunkce</td><td class="zn">A ∨ B</td><td class="rd">„A nebo B“</td>
+              <td>platí aspoň jedno</td><td>neplatí ani jedno</td></tr>
+          <tr><td class="nm">Implikace</td><td class="zn">A ⇒ B</td><td class="rd">„jestliže A, pak B“</td>
+              <td>ve všech ostatních případech</td><td>A platí a B neplatí</td></tr>
+          <tr><td class="nm">Ekvivalence</td><td class="zn">A ⇔ B</td><td class="rd">„A právě tehdy, když B“</td>
+              <td>hodnoty se shodují</td><td>hodnoty se liší</td></tr>
+        </table>
+      </div>
+    </div>
+    <p class="lead" style="margin-top:16px">Implikaci se často říká i „z A plyne B“ nebo „A je
+      postačující podmínka pro B“. U ekvivalence uslyšíte „nutná a postačující podmínka“.</p>
+  </div>
+</section>
+
 <!-- 12 -->
 <section class="slide">
   <div class="wrap">
     <div class="kicker">Souhrn</div>
     <h2>Všechny spojky v jedné tabulce</h2>
     <div class="card" style="margin-top:16px">
-      <table class="tt">
-        <tr><th>A</th><th>B</th><th class="accent">A ∧ B</th><th class="accent">A ∨ B</th><th class="accent">A ⇒ B</th><th class="accent">A ⇔ B</th></tr>
-        <tr><td class="v0">0</td><td class="v0">0</td><td class="res v0">0</td><td class="res v0">0</td><td class="res v1">1</td><td class="res v1">1</td></tr>
-        <tr><td class="v0">0</td><td class="v1">1</td><td class="res v0">0</td><td class="res v1">1</td><td class="res v1">1</td><td class="res v0">0</td></tr>
-        <tr><td class="v1">1</td><td class="v0">0</td><td class="res v0">0</td><td class="res v1">1</td><td class="res v0">0</td><td class="res v0">0</td></tr>
-        <tr><td class="v1">1</td><td class="v1">1</td><td class="res v1">1</td><td class="res v1">1</td><td class="res v1">1</td><td class="res v1">1</td></tr>
+      <div class="tablewrap">
+      <table class="tt wide" style="min-width:700px">
+        <tr><th>A</th><th>B</th><th>slovy</th><th class="accent">A ∧ B</th><th class="accent">A ∨ B</th><th class="accent">A ⇒ B</th><th class="accent">A ⇔ B</th></tr>
+        <tr><td class="v0">0</td><td class="v0">0</td><td>nepravda, nepravda</td><td class="res v0">0</td><td class="res v0">0</td><td class="res v1">1</td><td class="res v1">1</td></tr>
+        <tr><td class="v0">0</td><td class="v1">1</td><td>nepravda, pravda</td><td class="res v0">0</td><td class="res v1">1</td><td class="res v1">1</td><td class="res v0">0</td></tr>
+        <tr><td class="v1">1</td><td class="v0">0</td><td>pravda, nepravda</td><td class="res v0">0</td><td class="res v1">1</td><td class="res v0">0</td><td class="res v0">0</td></tr>
+        <tr><td class="v1">1</td><td class="v1">1</td><td>pravda, pravda</td><td class="res v1">1</td><td class="res v1">1</td><td class="res v1">1</td><td class="res v1">1</td></tr>
       </table>
+      </div>
     </div>
     <div class="grid g2" style="margin-top:18px">
       <div class="card"><h3>Jak si to zapamatovat</h3>
@@ -892,13 +1039,26 @@ p.keys{border:0; padding:0; display:block; line-height:2.1; letter-spacing:.12em
   document.getElementById('btn-next').addEventListener('click', function(e){ e.currentTarget.blur(); show(idx + 1); });
   document.getElementById('btn-fs').addEventListener('click', function(e){ e.currentTarget.blur(); toggleFs(); });
 
-  // swipe na dotykových zařízeních
-  var tx = 0, ty = 0;
-  document.addEventListener('touchstart', function(e){ tx = e.changedTouches[0].clientX; ty = e.changedTouches[0].clientY; }, {passive:true});
+  document.getElementById('nav-prev').addEventListener('click', function(){ show(idx - 1); });
+  document.getElementById('nav-next').addEventListener('click', function(){ show(idx + 1); });
+
+  // dotyk: swipe doleva/doprava + ťuknutí na volnou plochu snímku
+  var tx = 0, ty = 0, moved = false;
+  document.addEventListener('touchstart', function(e){
+    tx = e.changedTouches[0].clientX; ty = e.changedTouches[0].clientY; moved = false;
+  }, {passive:true});
+  document.addEventListener('touchmove', function(){ moved = true; }, {passive:true});
   document.addEventListener('touchend', function(e){
     var dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty;
-    if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.6) { show(idx + (dx < 0 ? 1 : -1)); }
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.4) { show(idx + (dx < 0 ? 1 : -1)); }
   }, {passive:true});
+
+  var coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  document.addEventListener('click', function(e){
+    if (!coarse) return;
+    if (e.target.closest('.drawing, button, table, .chips, .verdict, .note, kbd, a')) return;
+    show(idx + 1);
+  });
 
   // ---------- pomocné funkce ----------
   function setVal(el, v){ el.textContent = v ? '1' : '0'; el.className = 'val ' + (v ? 'is1' : 'is0'); }
@@ -911,7 +1071,7 @@ p.keys{border:0; padding:0; display:block; line-height:2.1; letter-spacing:.12em
     else { lever.setAttribute('transform', 'rotate(-32 ' + x + ' ' + y + ')'); }
     var v = g.querySelector('.swval');
     v.textContent = on ? '1' : '0';
-    v.setAttribute('fill', on ? 'var(--live)' : 'var(--chalk-3)');
+    v.setAttribute('fill', on ? 'var(--live)' : 'var(--ink-3)');
   }
 
   function markRow(table, a, b){

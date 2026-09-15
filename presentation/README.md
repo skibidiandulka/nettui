@@ -15,11 +15,13 @@ přímo v souboru, takže prezentace vypadá stejně i na školním počítači 
 | `F` | celá obrazovka |
 | `A` / `B` | přepnutí výroku A nebo B na interaktivním snímku |
 
-Na dotykových zařízeních se listuje přejetím prstem doleva/doprava.
+Na telefonu a tabletu se listuje třemi způsoby: přejetím prstem, tlačítky `←` / `→`
+v dolních rozích nebo ťuknutím na volnou plochu snímku (interaktivní části se tím
+nespustí).
 
-## Obsah (13 snímků)
+## Obsah (16 snímků)
 
-1. Titulní snímek a ovládání
+1. Titulní snímek, přehled spojek a ovládání
 2. Co je výrok
 3. Přehled spojek + negace (interaktivní)
 4. Konjunkce — definice a pravdivostní tabulka
@@ -28,18 +30,24 @@ Na dotykových zařízeních se listuje přejetím prstem doleva/doprava.
 7. **Disjunkce interaktivně** — paralelní zapojení dvou vypínačů
 8. Implikace — definice a pravdivostní tabulka
 9. **Implikace interaktivně** — „Pokud přineseš mléko, bude buchta.“
-10. Ekvivalence — definice a pravdivostní tabulka
-11. **Ekvivalence interaktivně** — semafor a chodec na přechodu
-12. Souhrnná tabulka všech spojek + de Morganovy zákony
-13. Závěr
+10. Implikace — další příklady a test „vadí nám to?“
+11. Ekvivalence — definice a pravdivostní tabulka
+12. **Ekvivalence interaktivně** — semafor a chodec na přechodu
+13. Ekvivalence — další příklady a rozdíl mezi ⇒ a ⇔
+14. Zápis, čtení nahlas a kdy co platí
+15. Souhrnná tabulka všech spojek + de Morganovy zákony
+16. Závěr
+
+Poznámky pro toho, kdo prezentuje — historie oboru, co říct u jednotlivých listů
+a další příklady — jsou v souboru [`poznamky-pro-prezentujiciho.md`](poznamky-pro-prezentujiciho.md).
 
 Na každém interaktivním snímku se u výroků zobrazuje jejich pravdivostní hodnota
 (0/1), v tabulce se zvýrazňuje aktuální řádek a pod ní je slovní vyhodnocení.
 
 ## Vzhled
 
-Prezentace je vysázená jako technický výkres: modrotiskový podklad s milimetrovou
-sítí, rámeček listu a popisové pole dole. Schémata používají skutečné referenční
+Prezentace je vysázená jako technický výkres: světlý papír s milimetrovou sítí,
+rámeček listu a popisové pole dole. Schémata používají skutečné referenční
 označení součástek (GB1 baterie, S1/S2 vypínače, HL1 žárovka) a u konjunkce
 a disjunkce je i značka logického hradla podle ČSN EN 60617-12. Jantarová je
 v celé prezentaci jediná výrazná barva a znamená vždy totéž — „teče proud“,
